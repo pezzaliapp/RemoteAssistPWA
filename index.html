@@ -15,7 +15,7 @@
   <header>
     <div class="brand">
       <img src="icons/icon-192.png" alt="" width="24" height="24">
-      <strong>Remote Assist — MultiCam</strong><span class="tag">GitHub‑Only</span>
+      <strong>Remote Assist — MultiCam</strong><span class="tag">GitHub-Only</span>
     </div>
     <nav>
       <button id="btnInstall" hidden>Installa</button>
@@ -65,7 +65,7 @@
           <button id="btnStopAll">Stop</button>
           <label class="inline"><input type="checkbox" id="micToggle" checked> Microfono</label>
         </div>
-        <small>Funziona con occhiali/webcam compatibili **UVC** che il browser vede come videoinput.</small>
+        <small>Funziona con occhiali/webcam compatibili <b>UVC</b> che il browser vede come videoinput.</small>
       </div>
 
       <div class="card grid" id="videoGrid"></div>
@@ -100,9 +100,16 @@
       <div class="panel" id="panel-docs">
         <div class="row">
           <input type="file" id="filePicker" accept=".pdf,.png,.jpg,.jpeg,.svg">
-          <button id="btnSync">Sincronizza vista → remoto</button>
+          <button id="btnSync">Sync vista → remoto</button>
+          <button id="btnLaser">Laser ON</button>
+          <button id="btnPdfJs">Apri con PDF.js (CDN)</button>
         </div>
-        <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici"></iframe>
+        <div class="docWrap">
+          <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici"></iframe>
+          <div id="cursorOverlay"></div>
+          <div id="remoteCursor" class="cursorDot hidden"></div>
+          <div id="localCursor" class="cursorDot hidden"></div>
+        </div>
       </div>
 
       <div class="panel hidden" id="panel-annotate">
@@ -131,7 +138,6 @@
 
       <div class="panel hidden" id="panel-signal">
         <h3>Signaling manuale (senza server) — copia/incolla</h3>
-        <p><b>Esperto</b>: premi “Genera Offerta”, copia il blob SDP e invialo al Tecnico. <b>Tecnico</b>: incolla l'Offerta e premi “Crea Risposta”, poi inviala all'Esperto.</p>
         <div class="row">
           <button id="btnMakeOffer">Genera Offerta</button>
           <button id="btnMakeAnswer">Crea Risposta da Offerta</button>
@@ -140,14 +146,21 @@
         <label>Offerta / Risposta (SDP JSON):
           <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
         </label>
-        <div id="ghExplain" class="muted">
-          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” pubblicando commenti che contengono <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede un token con permessi sul repo.</p>
-          <div class="row">
-            <button id="btnGhStart">Collega Issue</button>
-            <button id="btnGhSend">Invia su Issue</button>
-            <button id="btnGhPoll">Aggiorna da Issue</button>
+        <div class="muted">
+          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” pubblicando commenti con <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede token.</p>
+          <div id="ghBox2">
+            <div class="row">
+              <input id="ghRepo" placeholder="owner/repo">
+              <input id="ghIssue" placeholder="# Issue">
+              <input id="ghToken" type="password" placeholder="ghp_...">
+            </div>
+            <div class="row">
+              <button id="btnGhStart">Collega Issue</button>
+              <button id="btnGhSend">Invia su Issue</button>
+              <button id="btnGhPoll">Aggiorna da Issue</button>
+            </div>
+            <textarea id="ghLog" rows="6" placeholder="Log GitHub..."></textarea>
           </div>
-          <textarea id="ghLog" rows="6" placeholder="Log GitHub..."></textarea>
         </div>
       </div>
     </section>
@@ -156,17 +169,15 @@
   <dialog id="help">
     <h3>Guida rapida</h3>
     <ol>
-      <li>Scegli <b>Ruolo</b> e la <b>Modalità di segnalazione</b> (Manuale funziona ovunque su GitHub Pages).</li>
-      <li>Aggiungi una o più <b>camere</b> (occhiali/webcam UVC).</li>
-      <li>Per collegarti, scambia l’<b>SDP</b> (blob) via chat esterna o usa l’opzione <b>GitHub Issues</b>.</li>
-      <li>Condividi <b>PDF/immagini</b> e usa <b>Annotazioni</b> per indicazioni chirurgiche sui componenti.</li>
+      <li>Carica un <b>PDF/immagine</b> o usa il sample.</li>
+      <li>Usa <b>Laser ON</b> per mostrare un puntatore sincronizzato verso il remoto (chirurgico sui componenti).</li>
+      <li>Per PDF avanzato, clicca <b>Apri con PDF.js</b> (CDN). Se vuoi caching, aggiungeremo pdf.js nel repo.</li>
+      <li>Nella tab <b>Segnaling</b>, collega i peer con Manuale o GitHub Issues.</li>
     </ol>
     <button id="closeHelp">Chiudi</button>
   </dialog>
 
   <script src="app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
-  </script>
+  <script> if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); } </script>
 </body>
 </html>

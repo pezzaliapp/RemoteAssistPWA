@@ -1,26 +1,21 @@
-# Remote Assist — MultiCam (PWA) — GitHub‑Only
+# Remote Assist — MultiCam (PWA · GitHub-Only) + Laser
 
-Versione **100% GitHub Pages** senza server: WebRTC con **segnaling manuale** (copia/incolla SDP) e opzione **GitHub Issues (beta)** come canale di scambio.
-- Multi‑camera (UVC), chat e annotazioni via DataChannel
-- Viewer documenti (PDF/immagini) con sync
-- Registrazione locale `.webm`
-- PWA installabile (manifest + service worker)
+Questa build aggiunge:
+- **Laser pointer sincronizzato** sulla vista documenti (overlay con coordinate normalizzate 0..1)
+- Pulsante **Apri con PDF.js (CDN)** per un viewer PDF avanzato senza server (funziona solo con file serviti via HTTP, non con blob)
 
-## Deploy su GitHub Pages
-1. Crea repo e pubblica il contenuto di questa cartella sul branch `gh-pages` (o abilita Pages dal branch `main`/`docs`).
-2. Apri l’URL Pages dalla barra del browser (HTTPS).
+## Uso del Laser
+1. Tab **Documenti** → **Laser ON** (si illumina il puntatore locale).
+2. Muovi il puntatore sull'area documento; il remoto vede il tuo laser in tempo reale.
+3. **Laser OFF** per disattivarlo. Il tasto **Sync vista** invia la posizione di scroll corrente.
 
-## Collegamento tra due utenti (senza server)
-1. Vai nella tab **Segnaling**.
-2. **Esperto** → clicca **Genera Offerta** e invia il JSON al Tecnico (es. WhatsApp).
-3. **Tecnico** → incolla nel box e clicca **Crea Risposta**, poi inviala all’Esperto.
-4. **Esperto** → incolla la risposta e premi **Applica Risposta**.
+## PDF.js (opzionale via CDN)
+- Premi **Apri con PDF.js (CDN)** per usare il viewer standard di pdf.js con pagina, zoom, ricerca, miniature.
+- Per funzionare deve trattarsi di un PDF servito via HTTP (es. dentro `/docs/` del repo). I file caricati via `<input>` diventano blob e non sono apribili dal viewer CDN.
+- Se vuoi **offline completo**, possiamo includere `pdfjs-dist` nel repo e metterlo in cache nel service worker.
 
-## Opzione "GitHub Issues" (beta)
-- Imposta `owner/repo`, `issue #` e un **token** con permessi sul repo (il token resta nel tuo browser).
-- I blob SDP vengono postati/recuperati come commenti nell’Issue.
-- Ideale per test interni senza server dedicato.
-
-> Limitazioni: iOS ha vincoli extra su codec e registrazione `.webm`. Per sessioni multi‑parte stabili e registrazioni centralizzate, in futuro potrai migrare a un **SFU** (es. mediasoup) mantenendo questa UI.
+## Collegamento peer (Pages-only)
+- **Manuale**: Genera Offerta → invia JSON → Crea Risposta → Applica Risposta.
+- **GitHub Issues (beta)**: usa un Issue come “stanza” postando/rileggendo i blob SDP.
 
 **Licenza**: MIT.
