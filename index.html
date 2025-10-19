@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1022">
+  <title>Remote Assist — MultiCam (PWA · GitHub Pages)</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="icons/icon-192.png" alt="" width="24" height="24">
+      <strong>Remote Assist — MultiCam</strong><span class="tag">GitHub‑Only</span>
+    </div>
+    <nav>
+      <button id="btnInstall" hidden>Installa</button>
+      <button id="btnHelp" title="Guida rapida">?</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="left">
+      <div class="card controls">
+        <h2>Sessione</h2>
+        <label>Ruolo:
+          <select id="role">
+            <option value="tech">Tecnico sul campo</option>
+            <option value="expert">Esperto remoto</option>
+          </select>
+        </label>
+        <label>Modalità di segnalazione (signaling):
+          <select id="sigMode">
+            <option value="manual">Manuale (copia/incolla)</option>
+            <option value="github">GitHub Issues (beta)</option>
+          </select>
+        </label>
+        <div id="ghBox" class="hidden">
+          <label>GitHub Repo (owner/name):
+            <input id="ghRepo" placeholder="pezzaliapp/remote-assist-signal">
+          </label>
+          <label>Issue # per la stanza:
+            <input id="ghIssue" placeholder="1">
+          </label>
+          <label>Token (scoped al repo): 
+            <input id="ghToken" type="password" placeholder="ghp_...">
+          </label>
+          <small>Il token resta nel tuo browser (localStorage). Puoi usare un issue privato.</small>
+        </div>
+        <div class="row">
+          <button id="btnJoin">Entra</button>
+          <button id="btnLeave" disabled>Esci</button>
+        </div>
+      </div>
+
+      <div class="card devices">
+        <h2>Sorgenti Video</h2>
+        <div class="row">
+          <select id="cameraSelect"></select>
+          <button id="btnAddCam">Aggiungi</button>
+          <button id="btnStopAll">Stop</button>
+          <label class="inline"><input type="checkbox" id="micToggle" checked> Microfono</label>
+        </div>
+        <small>Funziona con occhiali/webcam compatibili **UVC** che il browser vede come videoinput.</small>
+      </div>
+
+      <div class="card grid" id="videoGrid"></div>
+
+      <div class="card record">
+        <h2>Registrazione</h2>
+        <div class="row">
+          <button id="btnRec">Avvia Rec</button>
+          <a id="downloadRec" class="hidden">Scarica</a>
+        </div>
+      </div>
+
+      <div class="card io">
+        <h2>Connettori HW (stub)</h2>
+        <div class="row">
+          <button id="btnSerial">WebSerial</button>
+          <button id="btnUSB">WebUSB</button>
+          <button id="btnBT">WebBluetooth</button>
+        </div>
+        <small>Attivabili via HTTPS. Da specializzare per i tuoi strumenti.</small>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="tabs">
+        <button class="tab active" data-tab="docs">Documenti</button>
+        <button class="tab" data-tab="annotate">Annotazioni</button>
+        <button class="tab" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="signal">Segnaling</button>
+      </div>
+
+      <div class="panel" id="panel-docs">
+        <div class="row">
+          <input type="file" id="filePicker" accept=".pdf,.png,.jpg,.jpeg,.svg">
+          <button id="btnSync">Sincronizza vista → remoto</button>
+        </div>
+        <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici"></iframe>
+      </div>
+
+      <div class="panel hidden" id="panel-annotate">
+        <div class="row">
+          <button id="pen">Penna</button>
+          <button id="eraser">Gomma</button>
+          <button id="clear">Pulisci</button>
+          <label>Spessore <input id="thick" type="range" min="1" max="16" value="3"></label>
+        </div>
+        <div class="anno-wrap">
+          <img id="annoBg" src="docs/bg.jpg" alt="">
+          <canvas id="annoCanvas"></canvas>
+        </div>
+        <div class="row">
+          <button id="btnAnnoShare">Condividi schema su remoto</button>
+        </div>
+      </div>
+
+      <div class="panel hidden" id="panel-chat">
+        <div id="chatLog"></div>
+        <div class="row">
+          <input id="chatInput" placeholder="Scrivi un messaggio…">
+          <button id="chatSend">Invia</button>
+        </div>
+      </div>
+
+      <div class="panel hidden" id="panel-signal">
+        <h3>Signaling manuale (senza server) — copia/incolla</h3>
+        <p><b>Esperto</b>: premi “Genera Offerta”, copia il blob SDP e invialo al Tecnico. <b>Tecnico</b>: incolla l'Offerta e premi “Crea Risposta”, poi inviala all'Esperto.</p>
+        <div class="row">
+          <button id="btnMakeOffer">Genera Offerta</button>
+          <button id="btnMakeAnswer">Crea Risposta da Offerta</button>
+          <button id="btnApplyAnswer">Applica Risposta</button>
+        </div>
+        <label>Offerta / Risposta (SDP JSON):
+          <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
+        </label>
+        <div id="ghExplain" class="muted">
+          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” pubblicando commenti che contengono <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede un token con permessi sul repo.</p>
+          <div class="row">
+            <button id="btnGhStart">Collega Issue</button>
+            <button id="btnGhSend">Invia su Issue</button>
+            <button id="btnGhPoll">Aggiorna da Issue</button>
+          </div>
+          <textarea id="ghLog" rows="6" placeholder="Log GitHub..."></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="help">
+    <h3>Guida rapida</h3>
+    <ol>
+      <li>Scegli <b>Ruolo</b> e la <b>Modalità di segnalazione</b> (Manuale funziona ovunque su GitHub Pages).</li>
+      <li>Aggiungi una o più <b>camere</b> (occhiali/webcam UVC).</li>
+      <li>Per collegarti, scambia l’<b>SDP</b> (blob) via chat esterna o usa l’opzione <b>GitHub Issues</b>.</li>
+      <li>Condividi <b>PDF/immagini</b> e usa <b>Annotazioni</b> per indicazioni chirurgiche sui componenti.</li>
+    </ol>
+    <button id="closeHelp">Chiudi</button>
+  </dialog>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+  </script>
+</body>
+</html>
