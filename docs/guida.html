@@ -1,17 +1,139 @@
-<!doctype html><html lang="it"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Guida illustrata — pezzaliAPP Remote Assist SUITE</title>
-<link rel="stylesheet" href="../styles.css">
-<style>body{padding:16px}h1{margin-top:0}.figure{border:1px solid #223082;border-radius:10px;overflow:hidden;margin:12px 0}.figure img{width:100%;display:block}.callout{background:#0f183a;border:1px solid #223082;border-radius:10px;padding:10px;margin:10px 0}kbd{background:#142153;padding:2px 6px;border-radius:6px;border:1px solid #233084}ol>li{margin:6px 0}</style>
-</head><body>
-<h1>Guida illustrata — pezzaliAPP Remote Assist SUITE</h1>
-<p>Collega un <b>Tecnico</b> e un <b>Esperto</b> con la PWA su GitHub Pages.</p>
-<h2>1. Collegamento Manuale (semplice)</h2>
-<ol><li>Il <b>Tecnico</b> apre la PWA → Tab <b>Segnaling</b> → <kbd>Genera Offerta</kbd>.</li><li>Copia il JSON e invialo all’<b>Esperto</b>.</li><li>L’<b>Esperto</b> incolla il JSON nella sua PWA → <kbd>Crea Risposta</kbd>.</li><li>Invia il JSON di risposta al <b>Tecnico</b>.</li><li>Il <b>Tecnico</b> incolla → <kbd>Applica Risposta</kbd>. ✅ Connessi.</li></ol>
-<h2>2. Collegamento GitHub Issues (automatico)</h2>
-<div class="callout"><p><b>Prerequisiti:</b> repo GitHub e token personale (scope: repo per pubblici).</p></div>
-<ol><li>Crea un <b>Issue</b> (es. “Sessione Assistenza 1”).</li><li>Compila <b>owner/repo</b>, <b># issue</b> e il <b>token</b> nella PWA.</li><li><b>Tecnico</b>: <kbd>Genera Offerta</kbd> → <kbd>Invia su Issue</kbd>.</li><li><b>Esperto</b>: <kbd>Aggiorna da Issue</kbd> → <kbd>Crea Risposta</kbd> → <kbd>Invia su Issue</kbd>.</li><li><b>Tecnico</b>: <kbd>Aggiorna da Issue</kbd> → <kbd>Applica Risposta</kbd>.</li></ol>
-<h2>3. Suggerimenti</h2>
-<ul><li>Per POV usa la <b>Mobile Cam</b> (torcia, fullscreen, orientamento).</li><li>Audio negli occhiali via Bluetooth; video da smartphone/webcam.</li><li>Su iOS non è disponibile il cambio uscita audio via <code>setSinkId</code>.</li><li>Se l’app è “bloccata”, ricarica con cache pulita (Shift + F5).</li></ul>
-<p class="muted">Pagina in cache dopo il primo caricamento.</p>
-</body></html>
+<link rel="icon" href="../icons/icon-192.png" type="image/png">
+<style>
+  :root{--bg:#0b1022;--ink:#eaf1ff;--muted:#9fb0d8;--line:#1b2552;--chip:#172358;--cta:#2dd4bf}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -20%,#172042,var(--bg));
+       color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:980px;margin:0 auto;padding:20px}
+  header{position:sticky;top:0;z-index:2;background:#0e1533cc;backdrop-filter:blur(6px);
+         border-bottom:1px solid var(--line)}
+  header .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 20px}
+  h1{margin:18px 0 8px 0;font-size:28px}
+  h2{margin:26px 0 12px 0;font-size:22px}
+  p,li{color:#dbe5ff}
+  .card{border:1px solid var(--line);background:linear-gradient(180deg,#0f183a,#0c1431);
+        border-radius:12px;padding:14px}
+  .btn{appearance:none;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;
+       color:#fff;border-radius:10px;border:1px solid #2b3a86;cursor:pointer;
+       background:linear-gradient(180deg,#1a275f,#162155)}
+  .btn:hover{filter:brightness(1.07)}
+  .btn-cta{border-color:#1aa39a;background:linear-gradient(180deg,#2dd4bf,#1fb1a5);color:#032a27}
+  .btn-outline{background:#0f1a49;border-color:#243386;color:#eaf1ff}
+  .chip{display:inline-block;background:var(--chip);border:1px solid #243386;border-radius:8px;
+        padding:3px 8px;font-size:13px;margin-left:6px}
+  .muted{color:var(--muted)}
+  ol{margin:0;padding-left:22px}
+  li{margin:6px 0}
+  footer{margin:40px 0 20px 0;color:#a8b9e9}
+  footer a{color:#cfe5ff;text-decoration:none;border-bottom:1px dotted #5c7ad1}
+  /* Dialog licenza */
+  dialog{border:none;border-radius:14px;padding:0;max-width:760px;width:92%;color:var(--ink);
+         background:#0f1737}
+  dialog::backdrop{background:rgba(3,6,20,.6);backdrop-filter:blur(3px)}
+  .dlg-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;
+            border-bottom:1px solid var(--line)}
+  .dlg-body{padding:18px}
+  .dlg-body h3{margin:0 0 8px 0}
+  .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       background:#0e1a44;border:1px solid #253482;border-radius:6px;padding:.1em .4em}
+  pre{white-space:pre-wrap;background:#0a1330;border:1px solid #253482;border-radius:10px;padding:12px}
+  /* box prerequisiti */
+  .note{border:1px dashed #2b3a86;background:#0a1330;border-radius:10px;padding:12px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="bar wrap">
+      <div>
+        <strong>Guida illustrata — pezzaliAPP Remote Assist SUITE</strong>
+      </div>
+      <div class="actions" style="display:flex;gap:8px">
+        <!-- Torna alla PWA -->
+        <a class="btn btn-cta" href="../index.html" aria-label="Torna alla PWA">← Torna alla PWA</a>
+        <!-- Licenza -->
+        <button class="btn btn-outline" id="btnLic">Licenza</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="muted">Collega un <b>Tecnico</b> e un <b>Esperto</b> con la PWA su GitHub Pages.</p>
+
+    <h2>1. Collegamento Manuale (semplice)</h2>
+    <ol class="card">
+      <li>Il <b>Tecnico</b> apre la PWA → Tab <b>Segnaling</b> → <span class="chip">Genera Offerta</span>.</li>
+      <li>Copia il JSON e invialo all’<b>Esperto</b>.</li>
+      <li>L’<b>Esperto</b> incolla il JSON nella sua PWA → <span class="chip">Crea Risposta</span>.</li>
+      <li>Invia il JSON di risposta al <b>Tecnico</b>.</li>
+      <li>Il <b>Tecnico</b> incolla → <span class="chip">Applica Risposta</span>. ✅ Connessi.</li>
+    </ol>
+
+    <h2>2. Collegamento GitHub Issues (automatico)</h2>
+    <div class="note" style="margin:10px 0 12px 0">
+      <b>Prerequisiti</b>: repo GitHub e token personale (scope: repo per pubblici).
+    </div>
+    <ol class="card">
+      <li>Crea un <i>Issue</i> (es. “Sessione Assistenza 1”).</li>
+      <li>Compila <span class="kbd">owner/repo</span>, #<span class="kbd">Issue</span> e il <span class="kbd">token</span> nella PWA.</li>
+      <li><b>Tecnico</b>: <span class="chip">Genera Offerta</span> → <span class="chip">Invia su Issue</span>.</li>
+      <li><b>Esperto</b>: <span class="chip">Aggiorna da Issue</span> → <span class="chip">Crea Risposta</span> → <span class="chip">Invia su Issue</span>.</li>
+      <li><b>Tecnico</b>: <span class="chip">Aggiorna da Issue</span> → <span class="chip">Applica Risposta</span>.</li>
+    </ol>
+
+    <h2>3. Suggerimenti</h2>
+    <ul class="card">
+      <li>Per POV usa la <b>Mobile Cam</b> (torcia, fullscreen, orientamento).</li>
+      <li>Audio negli occhiali via Bluetooth; video da smartphone/webcam.</li>
+      <li>Se l’output non è disponibile cambia uscita audio via <span class="kbd">setSinkId</span>.</li>
+      <li>Se l’app è “bloccata”, ricarica con cache pulita (<span class="kbd">Shift + F5</span>).</li>
+    </ul>
+
+    <footer>
+      <small>© 2025 Alessandro Pezzali — pezzaliAPP.com · Tutti i diritti riservati — Uso con licenza ·
+      <a href="mailto:info@alessandropezzali.it">info@alessandropezzali.it</a></small>
+    </footer>
+  </main>
+
+  <!-- Dialog Licenza -->
+  <dialog id="licDlg">
+    <div class="dlg-head">
+      <strong>Licenza d’uso</strong>
+      <button class="btn btn-outline" id="closeLic">Chiudi</button>
+    </div>
+    <div class="dlg-body">
+      <h3>Termini sintetici</h3>
+      <ul>
+        <li>Uso consentito a clienti autorizzati e collaboratori per assistenza remota.</li>
+        <li>È vietata la rivendita o la redistribuzione senza consenso scritto.</li>
+        <li>È vietato rimuovere loghi, crediti o marchi.</li>
+        <li>I log tecnici e i dati restano di proprietà del rispettivo titolare.</li>
+      </ul>
+
+      <h3>Testo della licenza</h3>
+      <pre>
+pezzaliAPP Remote Assist SUITE — Licenza d’uso
+
+Copyright © 2025 Alessandro Pezzali.
+
+È concessa all’Utente finale una licenza d’uso non esclusiva, non trasferibile, per
+impieghi interni di supporto tecnico remoto. È vietata la redistribuzione, la sub-licenza
+e l’uso commerciale come servizio terzo senza autorizzazione scritta.
+
+IL SOFTWARE È FORNITO "COSÌ COM’È", SENZA GARANZIE DI ALCUN TIPO.
+      </pre>
+    </div>
+  </dialog>
+
+<script>
+  const lic = document.getElementById('licDlg');
+  document.getElementById('btnLic')?.addEventListener('click', ()=> lic.showModal());
+  document.getElementById('closeLic')?.addEventListener('click', ()=> lic.close());
+</script>
+</body>
+</html>
