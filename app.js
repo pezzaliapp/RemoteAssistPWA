@@ -8,6 +8,14 @@
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
   $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal()); $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
 
+  // Tour safe default
+  const tourRoot = document.getElementById('tour');
+  if (tourRoot) tourRoot.classList.add('hidden');
+  const notour = new URL(location.href).searchParams.get('notour')==='1';
+  if (notour && tourRoot) tourRoot.remove();
+  function tourShow(){ tourRoot?.classList.remove('hidden'); tourRoot?.classList.add('show'); }
+  function tourHide(){ tourRoot?.classList.remove('show'); tourRoot?.classList.add('hidden'); }
+
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
   $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
     $$('.mode').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
@@ -19,13 +27,6 @@
   const btnAddCam=$('#btnAddCam'), btnStopAll=$('#btnStopAll');
   const sdpBox=$('#sdpBox'); const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
   const live=$('.live-indicator');
-
-  function setLive(active){
-    if(!live) return;
-    live.classList.toggle('idle', !active);
-    live.classList.toggle('live', !!active);
-    live.title = active ? 'Assist in corso' : 'Inattivo';
-  }
 
   async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
   async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
@@ -122,12 +123,13 @@
   function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
   overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
 
-  // PDF.js: usa viewer ufficiale Mozilla per evitare problemi di CDN
+  // PDF.js / DOCX viewer
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
     if(!url){ appendChat('Nessun documento aperto','sys'); return; }
-    if(url.toLowerCase().endswith && url.toLowerCase().endswith('.docx')){
-      if(url.startsWith('blob:')){ appendChat('DOCX locale (blob) non apribile dal viewer online. Metti il file in /docs o usa URL pubblico.','sys'); return; }
+    const low = url.toLowerCase();
+    if(low.endsWith('.docx')){
+      if(url.startsWith('blob:')){ appendChat('DOCX locale (blob): usa file in /docs o URL pubblico per aprirlo nel viewer.','sys'); return; }
       const office = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
       if(docFrame) docFrame.src = office;
       appendChat('Aperto DOCX con Office Web Viewer','sys');
@@ -139,15 +141,15 @@
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
   });
 
-  // file picker: carica e invia URL al remoto
-  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const isDocx = /\.docx$/i.test(f.name||''); const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); if(isDocx){ appendChat('DOCX caricato come file locale (blob). Per aprirlo nel viewer usa un URL web o metti il file in /docs e aprilo da lì.','sys'); } });
+  // file picker
+  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato in locale (blob). Per aprirlo nel viewer usa un URL web o posizionalo in /docs.', 'sys'); } });
 
   // Sync vista → remoto: invia l'URL attuale del documento (compatibile cross-origin)
   $('#btnSync')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
-    if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.','sys'); return; }
-    if(!url){ appendChat('Nessun documento da sincronizzare.','sys'); return; }
-    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web. Metti il file in /docs o usa un link pubblico.','sys'); return; }
+    if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.', 'sys'); return; }
+    if(!url){ appendChat('Nessun documento da sincronizzare.', 'sys'); return; }
+    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web. Metti il file in /docs o usa un link pubblico.', 'sys'); return; }
     sendData({t:'docOpen', url});
     appendChat('Sync inviato ✓','sys');
   });
@@ -155,7 +157,7 @@
   // --------- WebRTC base + GitHub Issues (ridotto) ---------
   let pc=null, dc=null;
   function createPC(){ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]}); pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); }; pc.ondatachannel=e=>setupDC(e.channel); dc=pc.createDataChannel('ra'); setupDC(dc); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject))); }
-  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); setLive(true);}; dc.onclose=()=>{ setLive(false);}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} }; if(window.__setupDC__) window.__setupDC__(ch); }
+  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle');}; dc.onclose=()=>{live?.classList.add('idle');}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} }; if(window.__setupDC__) window.__setupDC__(ch); }
   async function waitIce(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(pc.localDescription); pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); }; }); }
   async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
   async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
@@ -173,7 +175,7 @@
 
   // ---------- Tutorial interattivo (Avvia guida) ----------
   const tourEl = document.getElementById('tour');
-  if (tourEl){
+  if (tourEl && !notour){
     const highlight = document.createElement('div'); highlight.className = 'tour-highlight'; tourEl.appendChild(highlight);
     const stepEl = tourEl.querySelector('.tour-step');
     const steps = [
@@ -200,27 +202,16 @@
       idx=i;
       const s=steps[idx];
       const target=document.querySelector(s.sel);
-      stepEl.textContent = s.text;
+      stepEl.textContent = `Passo ${idx+1}/${steps.length} — `+s.text;
       if(target) placeHighlight(target);
-      tourEl.classList.remove('hidden');
+      tourShow();
     }
-    function next(){ if(idx<steps.length-1) showStep(idx+1); else tourEl.classList.add('hidden'); }
+    function next(){ if(idx<steps.length-1) showStep(idx+1); else tourHide(); }
     function prev(){ if(idx>0) showStep(idx-1); }
     document.getElementById('tourNext')?.addEventListener('click', next);
     document.getElementById('tourPrev')?.addEventListener('click', prev);
-    document.getElementById('tourClose')?.addEventListener('click', ()=>tourEl.classList.add('hidden'));
+    document.getElementById('tourClose')?.addEventListener('click', tourHide);
     document.getElementById('btnTutorial')?.addEventListener('click', ()=> showStep(0));
     document.getElementById('startTour')?.addEventListener('click', ()=>{ document.getElementById('help')?.close(); showStep(0); });
   }
-  // ---- Esci (chiusura sessione) ----
-  function leaveSession(){
-    try{ dc && dc.close(); }catch{}
-    try{ pc && pc.close(); }catch{}
-    pc=null; dc=null;
-    try{ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); }catch{}
-    setLive(false);
-    appendChat('Hai lasciato la sessione.','sys');
-  }
-  document.getElementById('btnLeave')?.addEventListener('click', leaveSession);
-
 })();

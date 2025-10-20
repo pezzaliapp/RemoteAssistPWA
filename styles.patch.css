@@ -1,0 +1,18 @@
+/* === PATCH GUIDA + LASER (append-only) === */
+#tour.hidden { display: none !important; }
+#tour { display: none; }
+#tour.show { display: block; }
+#tour, #tour .tour-mask { pointer-events: none; }
+#tour.show, #tour.show .tour-mask { pointer-events: auto; }
+
+.tour-mask { position: absolute; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); }
+.tour-highlight { position: fixed; border: 2px solid #22d3ee; border-radius: 10px; box-shadow: 0 0 16px #22d3ee88; z-index: 2; }
+.tour-pop { position: fixed; background: #101736; color: #eaf1ff; border-radius: 12px; box-shadow: 0 4px 22px #0008; padding: 18px 20px; max-width: 340px; z-index: 3; border: 1px solid #22d3ee44; }
+.tour-step { font-size: 16px; line-height: 1.5; font-weight: 500; margin-bottom: 12px; }
+.tour-actions { text-align: right; }
+.tour-actions button { margin-left: 6px; padding: 6px 12px; font-size: 14px; background: #22d3ee22; color: #22d3ee; border: 1px solid #22d3ee66; border-radius: 6px; cursor: pointer; }
+.tour-actions button:hover { background: #22d3ee44; }
+
+#cursorOverlay { position: absolute; inset: 0; cursor: crosshair; z-index: 20; background: transparent; }
+.cursorDot { position: absolute; width: 14px; height: 14px; background: #ff0000bb; border-radius: 50%; border: 2px solid #fff3; transform: translate(-50%, -50%); pointer-events: none; z-index: 21; }
+.cursorDot.hidden { display: none !important; }
