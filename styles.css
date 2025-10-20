@@ -118,3 +118,48 @@ footer.legal{padding:8px 12px;border-top:1px solid #202a5a;background:#0e1533cc;
 .tour-pop[data-arrow="top"]::after{ top:-20px; left:28px; border-bottom-color:#0f1737; }
 .tour-pop[data-arrow="bottom"]::after{ bottom:-20px; left:28px; border-top-color:#0f1737; }
 .tour-pop[data-arrow="none"]::after{ display:none; }
+/* ====== MOBILE ONLY (iPhone/telefono) ====== */
+@media (max-width: 820px) {
+  /* Colonna unica, niente altezza fissa del main */
+  main{flex-direction:column;height:auto}
+  .sidebar{width:auto;padding-bottom:16px;border-right:0}
+
+  /* Barra TAB sempre visibile sotto l’header */
+  .tabs{
+    position: sticky; top: 56px; z-index: 4;
+    padding: 6px 4px 0; margin-top: 4px;
+    background: linear-gradient(180deg, rgba(11,16,34,.92), rgba(11,16,34,.80));
+    backdrop-filter: blur(4px);
+  }
+
+  /* Griglia video: scorre orizzontalmente e NON allunga la pagina */
+  #videoGrid{
+    display:flex; gap:8px; overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type: x mandatory; padding-bottom:6px;
+    max-height: 32vh;   /* limite di altezza su mobile */
+  }
+  #videoGrid .tile{ min-width: 56vw; scroll-snap-align: start; }
+  #videoGrid video{ height: 28vh; object-fit: cover; }
+
+  /* Pannelli contenuto: altezze più basse e scorrevoli */
+  #docFrame{ height: 56vh !important; }      /* prima era 60vh */
+  .anno-wrap{ height: 56vh !important; }
+
+  /* Overlay laser: assicurati che riceva eventi quando ON */
+  #cursorOverlay{ pointer-events: auto; }
+
+  /* Chat log più compatto */
+  #chatLog{ height: 40vh; }
+
+  /* Footer NON deve coprire contenuti */
+  footer.legal{ position: static; }
+  body{ padding-bottom: 12px; }
+}
+
+/* Fix iOS 100vh (useremo --vh da JS) */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 820px){
+    #docFrame{ height: calc(var(--vh, 1vh) * 56) !important; }
+    .anno-wrap{ height: calc(var(--vh, 1vh) * 56) !important; }
+  }
+}
