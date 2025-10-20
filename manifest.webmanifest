@@ -1,6 +1,6 @@
 {
-  "name": "Remote Assist — SUITE",
-  "short_name": "RA Suite",
+  "name": "pezzaliAPP Remote Assist SUITE v1.0",
+  "short_name": "RA SUITE",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1022",

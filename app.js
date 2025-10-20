@@ -1,33 +1,27 @@
-// Remote Assist — SUITE — app.js
+// app.js (logic + tutorial + indicator + signaling)
 (() => {
-  // PWA install
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
   btnInstall?.addEventListener('click', ()=>{ deferredPrompt?.prompt(); deferredPrompt=null; btnInstall.hidden=true; });
 
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-
-  // Tabs
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
   $('#btnHelp').onclick=()=>$('#help').showModal(); $('#closeHelp').onclick=()=>$('#help').close();
 
-  // Mode switch
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
   $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
     $$('.mode').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
     const m = btn.dataset.mode;
-    stdOnly.classList.toggle('hidden', m!=='standard');
-    gOnly.classList.toggle('hidden', m!=='glasses');
-    mOnly.classList.toggle('hidden', m!=='mobile');
+    stdOnly.classList.toggle('hidden', m!=='standard'); gOnly.classList.toggle('hidden', m!=='glasses'); mOnly.classList.toggle('hidden', m!=='mobile');
   }));
 
-  // Devices + WebRTC common
   const cameraSelect=$('#cameraSelect'), videoGrid=$('#videoGrid'), micToggle=$('#micToggle');
   const btnAddCam=$('#btnAddCam'), btnStopAll=$('#btnStopAll');
   const btnJoin=$('#btnJoin'), btnLeave=$('#btnLeave'); const sdpBox=$('#sdpBox');
   const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
+  const live=$('.live-indicator');
 
-  async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
+  async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
   async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
   function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
   async function stopAll(){ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); videoGrid.innerHTML=''; }
@@ -85,15 +79,15 @@
   // Smart Glasses specifics
   const btBtn=$('#btnBtBattery'), btStatus=$('#btStatus'), audioOut=$('#audioOut'), applySink=$('#applySink'), sinkInfo=$('#sinkInfo');
   let sinkReady=false;
-  async function loadSinks(){ if(!navigator.mediaDevices?.enumerateDevices){ sinkInfo.textContent='Uscita audio: enumerateDevices non disponibile.'; return; } const list=await navigator.mediaDevices.enumerateDevices(); const outs=list.filter(d=>d.kind==='audiooutput'); audioOut.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Uscita audio'}</option>`).join(''); sinkReady = ('setSinkId' in HTMLMediaElement.prototype); sinkInfo.textContent = sinkReady ? 'Puoi selezionare un’uscita audio compatibile (non iOS).' : 'Cambio uscita non supportato su questo browser.'; }
+  async function loadSinks(){ if(!navigator.mediaDevices?.enumerateDevices){ sinkInfo.textContent='Uscita audio: enumerateDevices non disponibile.'; return; } const list=await navigator.mediaDevices.enumerateDevices(); const outs=list.filter(d=>d.kind==='audiooutput'); if(audioOut) audioOut.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Uscita audio'}</option>`).join(''); sinkReady = ('setSinkId' in HTMLMediaElement.prototype); if(sinkInfo) sinkInfo.textContent = sinkReady ? 'Puoi selezionare un’uscita audio compatibile (non iOS).' : 'Cambio uscita non supportato su questo browser.'; }
   loadSinks();
   applySink?.addEventListener('click', ()=>{ if(!sinkReady){ alert('Cambio uscita non supportato su questo browser.'); return; } const id=audioOut.value; $$('#videoGrid video').forEach(v=>{ if(v.setSinkId) try{ v.setSinkId(id); }catch(e){} }); });
-  btBtn?.addEventListener('click', async ()=>{ try{ const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['battery_service','device_information']}); btStatus.textContent='Connesso a '+(dev.name||'device'); const server=await dev.gatt.connect(); try{ const svc=await server.getPrimaryService('battery_service'); const ch=await svc.getCharacteristic('battery_level'); const val=await ch.readValue(); const lvl=val.getUint8(0); btStatus.textContent+=' — Batteria: '+lvl+'%'; }catch{ btStatus.textContent+=' — Batteria non esposta'; } dev.ongattserverdisconnected=()=> btStatus.textContent='Disconnesso'; }catch(e){ btStatus.textContent='Connessione fallita o non supportata'; } });
+  btBtn?.addEventListener('click', async ()=>{ try{ const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['battery_service','device_information']}); if(btStatus) btStatus.textContent='Connesso a '+(dev.name||'device'); const server=await dev.gatt.connect(); try{ const svc=await server.getPrimaryService('battery_service'); const ch=await svc.getCharacteristic('battery_level'); const val=await ch.readValue(); const lvl=val.getUint8(0); if(btStatus) btStatus.textContent+=' — Batteria: '+lvl+'%'; }catch{ if(btStatus) btStatus.textContent+=' — Batteria non esposta'; } dev.ongattserverdisconnected=()=> btStatus && (btStatus.textContent='Disconnesso'); }catch(e){ btStatus && (btStatus.textContent='Connessione fallita o non supportata'); } });
 
   // WebRTC core + GitHub Issues signaling
   let pc=null, dc=null;
   function createPC(){ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}], iceCandidatePoolSize:1}); pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); }; pc.ondatachannel=e=>setupDC(e.channel); dc=pc.createDataChannel('ra'); setupDC(dc); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject))); }
-  function setupDC(ch){ dc=ch; dc.onopen=()=>appendChat('(canale dati aperto)','sys'); dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); if(m.t==='anno'){ if(m.evt==='clear') ctx.clearRect(0,0,canvas.width,canvas.height); if(m.evt==='down'||m.evt==='move'){ const p=m.payload; const prev=mode,th0=thick.value; mode=p.mode; thick.value=p.th; drawDot(p.x,p.y); mode=prev; thick.value=th0; } } if(m.t==='cursor'){ $('#remoteCursor').classList.remove('hidden'); const nx=m.nx,ny=m.ny; const rect=$('.docWrap').getBoundingClientRect(); $('#remoteCursor').style.left=(nx*rect.width)+'px'; $('#remoteCursor').style.top=(ny*rect.height)+'px'; } if(m.t==='docSync'){ /* hook scroll */ } }catch{} }; }
+  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle');}; dc.onclose=()=>{live?.classList.add('idle');}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); if(m.t==='anno'){ if(m.evt==='clear') ctx.clearRect(0,0,canvas.width,canvas.height); if(m.evt==='down'||m.evt==='move'){ const p=m.payload; const prev=mode,th0=thick.value; mode=p.mode; thick.value=p.th; drawDot(p.x,p.y); mode=prev; thick.value=th0; } } if(m.t==='cursor'){ $('#remoteCursor').classList.remove('hidden'); const nx=m.nx,ny=m.ny; const rect=$('.docWrap').getBoundingClientRect(); $('#remoteCursor').style.left=(nx*rect.width)+'px'; $('#remoteCursor').style.top=(ny*rect.height)+'px'; } if(m.t==='docSync'){ /* hook scroll */ } }catch{} }; }
   async function waitIce(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(pc.localDescription); pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); }; }); }
   async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
   async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
@@ -107,6 +101,23 @@
   $('#btnGhSend').onclick=async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } };
   $('#btnGhPoll').onclick=async ()=>{ try{ const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } };
 
-  btnJoin.onclick=()=>{ btnJoin.disabled=true; btnLeave.disabled=false; };
-  btnLeave.onclick=()=>{ pc && pc.close(); pc=null; dc=null; btnJoin.disabled=false; btnLeave.disabled=true; };
+  // Tutorial overlay
+  const tourEl=$('#tour'), tourStep=$('.tour-step'), tourPrev=$('#tourPrev'), tourNext=$('#tourNext'), tourClose=$('#tourClose'), btnTutorial=$('#btnTutorial'), btnStartInHelp=$('#startTour');
+  const highlight=document.createElement('div'); highlight.className='tour-highlight'; tourEl.appendChild(highlight);
+  const steps=[
+    {sel:'.modes', text:'Scegli la modalità: Standard, Smart Glasses o Mobile Cam.'},
+    {sel:'.tab[data-tab="signal"]', text:'Vai nella tab “Segnaling” per stabilire la connessione.'},
+    {sel:'#btnMakeOffer', text:'Tecnico: premi “Genera Offerta” e copia il JSON.'},
+    {sel:'#sdpBox', text:'Incolla qui l’offerta (Esperto) oppure la risposta (Tecnico).'},
+    {sel:'#btnMakeAnswer', text:'Esperto: “Crea Risposta da Offerta”, poi inviala al Tecnico.'},
+    {sel:'#btnApplyAnswer', text:'Tecnico: “Applica Risposta” — la connessione sarà stabilita.'},
+    {sel:'#btnLaser', text:'Usa il Laser per indicare i dettagli sul documento condiviso.'}
+  ];
+  let idx=0;
+  function placeHighlight(target){ const r=target.getBoundingClientRect(); highlight.style.left=(r.left-6)+'px'; highlight.style.top=(r.top-6)+'px'; highlight.style.width=(r.width+12)+'px'; highlight.style.height=(r.height+12)+'px'; const pop=$('.tour-pop'); const px=Math.min(window.innerWidth-380, Math.max(16, r.right+16)); const py=Math.min(window.innerHeight-160, Math.max(16, r.top)); pop.style.left=px+'px'; pop.style.top=py+'px'; }
+  function showStep(i){ idx=i; const s=steps[idx]; const target=document.querySelector(s.sel); if(!target){ tourStep.textContent='Step non disponibile su questo device. Prosegui.'; } else { placeHighlight(target); tourStep.textContent=s.text; } tourEl.classList.remove('hidden'); }
+  function next(){ if(idx<steps.length-1) showStep(idx+1); else tourEl.classList.add('hidden'); }
+  function prev(){ if(idx>0) showStep(idx-1); }
+  $('#tourNext').addEventListener('click', next); $('#tourPrev').addEventListener('click', prev); $('#tourClose').addEventListener('click', ()=>tourEl.classList.add('hidden'));
+  btnTutorial.addEventListener('click', ()=>showStep(0)); btnStartInHelp?.addEventListener('click', ()=>{ $('#help').close(); showStep(0); });
 })();

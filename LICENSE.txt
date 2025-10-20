@@ -1,0 +1,11 @@
+PezzaliAPP Remote Assist SUITE v1.0
+Copyright © 2025 Alessandro Pezzali — pezzaliAPP.com
+Tutti i diritti riservati.
+
+LICENZA D’USO (Proprietary Use License — EULA)
+1) Il Software e la relativa documentazione sono opere protette dal diritto d’autore.
+2) È vietata la riproduzione, distribuzione, modifica, ingegneria inversa o commercializzazione senza autorizzazione scritta dell’Autore.
+3) L’uso è consentito esclusivamente previa concessione di licenza o rilascio d’uso da parte dell’Autore, per finalità interne, formative o dimostrative.
+4) È vietato rimuovere o alterare avvisi di copyright, marchi e note legali.
+5) Il Software è fornito “così com’è”, senza garanzia di alcun tipo. L’Autore non è responsabile per danni diretti o indiretti derivanti dall’uso.
+6) Per richieste di licenza o assistenza: info@alessandropezzali.it
