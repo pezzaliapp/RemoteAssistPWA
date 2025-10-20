@@ -1,4 +1,4 @@
-// app.js patch – annotazioni robuste + share + hook DC + TUTORIAL + PDF.js fix + Sync doc
+// app.js patch – annotazioni robuste + share + hook DC + TUTORIAL + PDF.js fix + Sync doc (+guard +leave)
 (() => {
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
@@ -107,7 +107,7 @@
   }
   initAnnotations();
 
-  // ------- Laser + documenti (+ PDF.js fix + Sync) -------
+  // ------- Laser + documenti (+ PDF.js fix + Sync con guard) -------
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
@@ -115,9 +115,11 @@
   function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
   overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
 
-  // PDF.js: usa viewer ufficiale Mozilla per evitare problemi di CDN
+  // PDF.js: viewer Mozilla; blocca blob:
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
+    if(!url){ return appendChat('Nessun documento aperto','sys'); }
+    if(url.startsWith('blob:')){ return appendChat('PDF.js non può aprire file locali (blob). Metti il PDF in /docs o usa URL pubblico.','sys'); }
     const viewer = 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(url);
     if(docFrame) docFrame.src = viewer;
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
@@ -126,11 +128,14 @@
   // file picker: carica e invia URL al remoto
   filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); });
 
-  // Sync vista → remoto: invia l'URL attuale del documento (compatibile cross-origin)
+  // Sync vista → remoto: invia l'URL attuale del documento (con guard DC + blob)
   $('#btnSync')?.addEventListener('click', ()=>{
+    if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.','sys'); return; }
     const url = docFrame?.src || '';
-    if(url) sendData({t:'docOpen', url});
-    appendChat('Sync inviato (document URL)','sys');
+    if(!url){ appendChat('Nessun documento da sincronizzare.','sys'); return; }
+    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web. Metti il file in /docs o usa un link pubblico.','sys'); return; }
+    sendData({t:'docOpen', url});
+    appendChat('Sync inviato ✓','sys');
   });
 
   // --------- WebRTC base + GitHub Issues (ridotto) ---------
@@ -149,8 +154,18 @@
   async function ghFetch(path, opts={}){ const tok=ghToken.value.trim(); if(!tok) throw new Error('Token mancante'); const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts}); const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; } }
   function repoParts(){ const [owner,repo]=ghRepo.value.split('/'); return {owner,repo}; }
   document.getElementById('btnGhStart')?.addEventListener('click', ()=> logGH('Issue collegata (client-side).'));
-  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
+  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('\"type\":\"offer\"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+\"```json\n\"+payload+\"\n```\"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
   document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{ try{ const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } });
+
+  // ---- Esci (minimo indispensabile)
+  function leaveSession(){
+    try{ dc && dc.close(); }catch{}
+    try{ pc && pc.close(); }catch{}
+    pc=null; dc=null;
+    stopAll();
+    appendChat('Hai lasciato la sessione.','sys');
+  }
+  document.getElementById('btnLeave')?.addEventListener('click', leaveSession);
 
   // ---------- Tutorial interattivo (Avvia guida) ----------
   const tourEl = document.getElementById('tour');
@@ -159,7 +174,7 @@
     const stepEl = tourEl.querySelector('.tour-step');
     const steps = [
       {sel:'.modes', text:'Scegli la modalità: Standard, Smart Glasses o Mobile Cam.'},
-      {sel:'.tab[data-tab="signal"]', text:'Vai nella tab “Segnaling” per collegarti.'},
+      {sel:'.tab[data-tab=\"signal\"]', text:'Vai nella tab “Segnaling” per collegarti.'},
       {sel:'#btnMakeOffer', text:'Tecnico: premi “Genera Offerta” e copia il JSON.'},
       {sel:'#sdpBox', text:'Incolla qui l’Offerta/Risposta.'},
       {sel:'#btnMakeAnswer', text:'Esperto: crea la Risposta, poi inviala.'},
