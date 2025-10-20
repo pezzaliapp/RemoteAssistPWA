@@ -1,4 +1,4 @@
-// app.js patch – annotazioni robuste + share + hook DC + TUTORIAL + PDF.js fix + Sync doc
+// app.js patch – annotazioni robuste + share + hook DC + TUTORIAL + PDF.js fix + Sync doc + Mobile toggle
 (() => {
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
@@ -7,6 +7,29 @@
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
   $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal()); $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
+
+  // ---- Modalità Mobile (toggle + fix iOS vh + persist) ----
+  const mToggle = document.getElementById('mobileMode');
+  function applyMobileMode(on){
+    document.body.classList.toggle('mobile-mode', !!on);
+    try{ localStorage.setItem('pezzaliapp.mobile', on?'1':'0'); }catch{}
+  }
+  // default: se width < 820 o preferenza salvata
+  (function initMobilePref(){
+    let pref;
+    try{ pref = localStorage.getItem('pezzaliapp.mobile'); }catch{}
+    const auto = (pref===null) ? (window.innerWidth < 820) : (pref==='1');
+    if (mToggle) { mToggle.checked = auto; }
+    applyMobileMode(auto);
+  })();
+  // toggle listener
+  mToggle?.addEventListener('change', () => applyMobileMode(mToggle.checked));
+  // iOS 100vh fix
+  function setVhVar(){
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+  }
+  setVhVar(); window.addEventListener('resize', setVhVar);
 
   // Tour safe default
   const tourRoot = document.getElementById('tour');
