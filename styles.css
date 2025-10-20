@@ -137,3 +137,44 @@ body.mobile-mode .tabs{position:sticky;top:56px;z-index:4;padding:6px 4px 0;marg
 .tour-pop[data-arrow="top"]::after{ top:-20px; left:28px; border-bottom-color:#0f1737; }
 .tour-pop[data-arrow="bottom"]::after{ bottom:-20px; left:28px; border-top-color:#0f1737; }
 .tour-pop[data-arrow="none"]::after{ display:none; }
+
+/* === MOBILE SCROLL FIX (iPhone/iOS) ====================== */
+/* Sblocca lo scroll del documento ed elimina gli overflow interni
+   che intrappolano il tocco in .sidebar e .content */
+@media (max-width: 820px){
+  html, body { height:auto; min-height:100%; }
+}
+
+/* Se l'utente attiva il toggle "Modalità Mobile" */
+body.mobile-mode{
+  overflow-y:auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.mobile-mode main{ height:auto; }
+
+/* Rimuovi gli scroll “interni” su mobile per far scorrere la pagina intera */
+body.mobile-mode .sidebar,
+body.mobile-mode .content{
+  overflow: visible !important;
+}
+
+/* Mantieni comunque lo style delle schede sticky sotto l’header */
+body.mobile-mode .tabs{
+  position: sticky; top: 56px; z-index: 4;
+  padding: 6px 4px 0; margin-top: 4px;
+  background: linear-gradient(180deg, rgba(11,16,34,.92), rgba(11,16,34,.80));
+  backdrop-filter: blur(4px);
+}
+
+/* Altezza più adatta su mobile (restano come prima) */
+body.mobile-mode #videoGrid{ max-height:32vh; }
+body.mobile-mode #docFrame{ height:56vh !important; }
+body.mobile-mode .anno-wrap{ height:56vh !important; }
+body.mobile-mode #chatLog{ height:40vh; }
+
+/* iOS 100vh fix: usa la variabile --vh già impostata da app.js */
+@supports (-webkit-touch-callout: none) {
+  body.mobile-mode #docFrame{ height: calc(var(--vh, 1vh) * 56) !important; }
+  body.mobile-mode .anno-wrap{ height: calc(var(--vh, 1vh) * 56) !important; }
+}
