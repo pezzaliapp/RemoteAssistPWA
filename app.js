@@ -14,7 +14,18 @@
   const notour = new URL(location.href).searchParams.get('notour')==='1';
   if (notour && tourRoot) tourRoot.remove();
   function tourShow(){ tourRoot?.classList.remove('hidden'); tourRoot?.classList.add('show'); }
-  function tourHide(){ tourRoot?.classList.remove('show'); tourRoot?.classList.add('hidden'); }
+  function tourHide(){
+    // chiudi e resetta spotlight
+    if (tourRoot) {
+      const maskEl = tourRoot.querySelector('.tour-mask');
+      if (maskEl){
+        maskEl.style.setProperty('--spot-x','-1000px');
+        maskEl.style.setProperty('--spot-y','-1000px');
+        maskEl.style.setProperty('--spot-r','0px');
+      }
+    }
+    tourRoot?.classList.remove('show'); tourRoot?.classList.add('hidden');
+  }
 
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
   $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
@@ -189,15 +200,22 @@
     ];
     let idx=0;
 
-    // --- nuovo posizionamento robusto ---
+    // --- posizionamento robusto + spotlight ---
     function placeHighlight(target){
       const pop = tourEl.querySelector('.tour-pop');
       const hi  = highlight;
+      const maskEl = tourEl.querySelector('.tour-mask');
+
       if (!target) {
         hi.style.width = hi.style.height = '0px';
         hi.style.left = hi.style.top = '-9999px';
-        pop.style.left = (window.innerWidth - pop.offsetWidth)/2 + 'px';
-        pop.style.top  = (window.innerHeight - pop.offsetHeight)/2 + 'px';
+        if (maskEl){
+          maskEl.style.setProperty('--spot-x','-1000px');
+          maskEl.style.setProperty('--spot-y','-1000px');
+          maskEl.style.setProperty('--spot-r','0px');
+        }
+        pop.style.left = (window.innerWidth - (pop.offsetWidth||360))/2 + 'px';
+        pop.style.top  = (window.innerHeight - (pop.offsetHeight||140))/2 + 'px';
         pop.dataset.arrow = 'none';
         return;
       }
@@ -228,10 +246,20 @@
       hi.style.width  = w + 'px';
       hi.style.height = h + 'px';
 
+      // --- spotlight: buco nell’overlay per leggere il target ---
+      if (maskEl){
+        const cx = r.left + r.width/2;
+        const cy = r.top  + r.height/2;
+        const rad = Math.hypot(r.width, r.height)/2 + 18; // margine morbido
+        maskEl.style.setProperty('--spot-x', cx + 'px');
+        maskEl.style.setProperty('--spot-y', cy + 'px');
+        maskEl.style.setProperty('--spot-r', rad + 'px');
+      }
+
       // Lato migliore per il popover
       const gap = 16;
-      const pw = pop.offsetWidth  || 360;
-      const ph = pop.offsetHeight || 140;
+      const pw = pop.offsetWidth  || 420;
+      const ph = pop.offsetHeight || 160;
       const roomRight = window.innerWidth  - (r.right + gap);
       const roomLeft  = r.left - gap;
       const roomAbove = r.top - gap;
@@ -294,7 +322,6 @@
   // ricarica pagina quando viene attivato un nuovo SW (opzionale, non invasivo)
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // Evita loop: ricarica solo una volta
       if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
     });
   }
