@@ -36,19 +36,30 @@ footer.legal{padding:8px 12px;border-top:1px solid #202a5a;background:#0e1533cc;
 /* tutorial overlay base */
 .tour{position:fixed;inset:0;z-index:9999}
 .tour.hidden{display:none}
+/* base (sovrascritto sotto) */
 .tour-mask{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
 .tour-pop{position:absolute;max-width:360px;background:#0a1330;border:1px solid #2b3a86;border-radius:10px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .tour-step{margin-bottom:8px}
 .tour-actions{display:flex;gap:6px;justify-content:flex-end}
 .tour-highlight{position:absolute;border:2px solid #2dd4bf;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none}
 
-/* ==== PATCH SOLO GUIDA (leggibilità pro) ==== */
+/* ==== PATCH SOLO GUIDA (leggibilità pro con "spotlight") ==== */
 .tour { position: fixed; inset: 0; z-index: 9999; }
+/* overlay con buco: le var --spot-* sono impostate da JS */
 .tour-mask{
   position:absolute; inset:0;
   background: rgba(5, 8, 22, .78);
   backdrop-filter: blur(3px);
   animation: tourFade .18s ease;
+  --spot-x: -1000px;   /* default: nessun foro */
+  --spot-y: -1000px;
+  --spot-r: 0px;
+  -webkit-mask: radial-gradient(circle at var(--spot-x) var(--spot-y),
+                                transparent var(--spot-r),
+                                black calc(var(--spot-r) + 1px));
+          mask: radial-gradient(circle at var(--spot-x) var(--spot-y),
+                                transparent var(--spot-r),
+                                black calc(var(--spot-r) + 1px));
 }
 .tour-highlight{
   position:fixed;
