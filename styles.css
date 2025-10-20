@@ -32,57 +32,47 @@ small,.muted{color:#8ea2d0}
 
 footer.legal{padding:8px 12px;border-top:1px solid #202a5a;background:#0e1533cc;color:#a3b7ea} footer.legal a{color:#cde4ff}
 @media (max-width:980px){ .sidebar{width:100%} main{flex-direction:column} }
-/* tutorial overlay */ .tour{position:fixed;inset:0;z-index:9999} .tour.hidden{display:none} .tour-mask{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)} .tour-pop{position:absolute;max-width:360px;background:#0a1330;border:1px solid #2b3a86;border-radius:10px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)} .tour-step{margin-bottom:8px} .tour-actions{display:flex;gap:6px;justify-content:flex-end} .tour-highlight{position:absolute;border:2px solid #2dd4bf;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none}
-/* ==== PATCH SOLO GUIDA (leggibilità pro) ==== */
-/* Non modifica altri elementi della PWA */
 
+/* tutorial overlay base */
+.tour{position:fixed;inset:0;z-index:9999}
+.tour.hidden{display:none}
+.tour-mask{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
+.tour-pop{position:absolute;max-width:360px;background:#0a1330;border:1px solid #2b3a86;border-radius:10px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.tour-step{margin-bottom:8px}
+.tour-actions{display:flex;gap:6px;justify-content:flex-end}
+.tour-highlight{position:absolute;border:2px solid #2dd4bf;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none}
+
+/* ==== PATCH SOLO GUIDA (leggibilità pro) ==== */
 .tour { position: fixed; inset: 0; z-index: 9999; }
 .tour-mask{
   position:absolute; inset:0;
-  background: rgba(5, 8, 22, .78);   /* più scura = più leggibile */
+  background: rgba(5, 8, 22, .78);
   backdrop-filter: blur(3px);
   animation: tourFade .18s ease;
 }
-
-/* riquadro evidenziato attorno al target */
 .tour-highlight{
   position:fixed;
   border-radius:12px;
-  box-shadow: 0 0 0 3px #22d3ee, 0 0 20px #22d3ee88; /* bordo + alone */
+  box-shadow: 0 0 0 3px #22d3ee, 0 0 20px #22d3ee88;
   transition: all .22s ease;
 }
-
-/* popover con contrasto alto e tipografia chiara */
 .tour-pop{
   position:fixed;
-  max-width: 420px;                  /* più largo, meno a capo */
-  background: #0f1737;               /* scuro pieno */
-  color: #eef4ff;                    /* testo molto chiaro */
-  border: 1px solid #2ab9d944;       /* bordo sottile azzurro */
+  max-width: 420px;
+  background: #0f1737;
+  color: #eef4ff;
+  border: 1px solid #2ab9d944;
   border-radius: 14px;
   padding: 18px 20px;
   box-shadow: 0 10px 28px rgba(0,0,0,.45);
 }
-
-/* triangolino “fumetto” */
-.tour-pop::after{
-  content:"";
-  position:absolute; left:-10px; top:20px;
-  border-width: 10px; border-style: solid;
-  border-color: transparent #0f1737 transparent transparent;
-  filter: drop-shadow(-1px 2px 0 rgba(42,185,217,.25));
-}
-
-/* testo più grande e leggibile */
 .tour-step{
   font-size: 17px;
   line-height: 1.55;
-  font-weight: 600;                  /* semi-bold */
+  font-weight: 600;
   letter-spacing: .1px;
-  text-shadow: 0 1px 0 rgba(0,0,0,.25); /* aumenta contrasto su sfondi */
+  text-shadow: 0 1px 0 rgba(0,0,0,.25);
 }
-
-/* pulsanti coerenti e leggibili */
 .tour-actions{ text-align:right; margin-top: 10px; }
 .tour-actions button{
   appearance: none;
@@ -97,19 +87,23 @@ footer.legal{padding:8px 12px;border-top:1px solid #202a5a;background:#0e1533cc;
 }
 .tour-actions button:hover{ filter: brightness(1.05); }
 .tour-actions button:active{ transform: translateY(1px); }
-
-/* variante secondaria per “Indietro” */
 #tourPrev{
   background: rgba(255,255,255,.08);
   color: #d8eeff;
   border-color: #2ab9d955;
 }
-
-/* accessibilità: se utente usa tema chiaro */
 @media (prefers-color-scheme: light){
   .tour-mask{ background: rgba(0,0,0,.55); }
   .tour-pop{ background: #0f1737; color:#f7fbff; }
 }
-
-/* animazione di comparsa dolce */
 @keyframes tourFade { from{opacity:0} to{opacity:1} }
+
+/* Freccia che punta il target a seconda del lato scelto */
+.tour-pop::after{
+  content:""; position:absolute; width:0; height:0; border:10px solid transparent;
+}
+.tour-pop[data-arrow="left"]::after{ left:-20px; top:24px; border-right-color:#0f1737; }
+.tour-pop[data-arrow="right"]::after{ right:-20px; top:24px; border-left-color:#0f1737; }
+.tour-pop[data-arrow="top"]::after{ top:-20px; left:28px; border-bottom-color:#0f1737; }
+.tour-pop[data-arrow="bottom"]::after{ bottom:-20px; left:28px; border-top-color:#0f1737; }
+.tour-pop[data-arrow="none"]::after{ display:none; }
