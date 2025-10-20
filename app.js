@@ -188,22 +188,93 @@
       {sel:'#btnLaser', text:'Usa Laser e Annotazioni per guidare il lavoro.'}
     ];
     let idx=0;
+
+    // --- nuovo posizionamento robusto ---
     function placeHighlight(target){
-      const r=target.getBoundingClientRect();
-      highlight.style.position='fixed';
-      highlight.style.left=(r.left-6)+'px'; highlight.style.top=(r.top-6)+'px';
-      highlight.style.width=(r.width+12)+'px'; highlight.style.height=(r.height+12)+'px';
       const pop = tourEl.querySelector('.tour-pop');
-      const px=Math.min(window.innerWidth-380, Math.max(16, r.right+16));
-      const py=Math.min(window.innerHeight-160, Math.max(16, r.top));
-      pop.style.left=px+'px'; pop.style.top=py+'px';
+      const hi  = highlight;
+      if (!target) {
+        hi.style.width = hi.style.height = '0px';
+        hi.style.left = hi.style.top = '-9999px';
+        pop.style.left = (window.innerWidth - pop.offsetWidth)/2 + 'px';
+        pop.style.top  = (window.innerHeight - pop.offsetHeight)/2 + 'px';
+        pop.dataset.arrow = 'none';
+        return;
+      }
+
+      // Se fuori viewport, scrolla in vista
+      const rect0 = target.getBoundingClientRect();
+      const margin = 24;
+      const outTop = rect0.top < margin;
+      const outBottom = rect0.bottom > (window.innerHeight - margin);
+      const outLeft = rect0.left < margin;
+      const outRight = rect0.right > (window.innerWidth - margin);
+      if (outTop || outBottom || outLeft || outRight) {
+        target.scrollIntoView({behavior:'smooth', block:'center', inline:'center'});
+      }
+
+      // Ricalcolo dopo scroll
+      const r = target.getBoundingClientRect();
+
+      // Riquadro evidenziato
+      const pad = 8;
+      const x = Math.max(0, r.left - pad);
+      const y = Math.max(0, r.top  - pad);
+      const w = Math.min(window.innerWidth  - x, r.width  + pad*2);
+      const h = Math.min(window.innerHeight - y, r.height + pad*2);
+      hi.style.position='fixed';
+      hi.style.left = x + 'px';
+      hi.style.top  = y + 'px';
+      hi.style.width  = w + 'px';
+      hi.style.height = h + 'px';
+
+      // Lato migliore per il popover
+      const gap = 16;
+      const pw = pop.offsetWidth  || 360;
+      const ph = pop.offsetHeight || 140;
+      const roomRight = window.innerWidth  - (r.right + gap);
+      const roomLeft  = r.left - gap;
+      const roomAbove = r.top - gap;
+      const roomBelow = window.innerHeight - (r.bottom + gap);
+
+      let px, py, arrow = 'left';
+      if (roomRight >= pw) {           // destra
+        px = r.right + gap;
+        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
+        arrow = 'left';
+      } else if (roomLeft >= pw) {     // sinistra
+        px = r.left - pw - gap;
+        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
+        arrow = 'right';
+      } else if (roomBelow >= ph) {    // sotto
+        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
+        py = r.bottom + gap;
+        arrow = 'top';
+      } else if (roomAbove >= ph) {    // sopra
+        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
+        py = r.top - ph - gap;
+        arrow = 'bottom';
+      } else {                         // centro
+        px = (window.innerWidth - pw)/2;
+        py = (window.innerHeight - ph)/2;
+        arrow = 'none';
+      }
+
+      // Clamp finale
+      px = Math.min(Math.max(px, margin), window.innerWidth  - pw - margin);
+      py = Math.min(Math.max(py, margin), window.innerHeight - ph - margin);
+
+      pop.style.left = px + 'px';
+      pop.style.top  = py + 'px';
+      pop.dataset.arrow = arrow;
     }
+
     function showStep(i){
       idx=i;
       const s=steps[idx];
       const target=document.querySelector(s.sel);
       stepEl.textContent = `Passo ${idx+1}/${steps.length} — `+s.text;
-      if(target) placeHighlight(target);
+      placeHighlight(target);
       tourShow();
     }
     function next(){ if(idx<steps.length-1) showStep(idx+1); else tourHide(); }
@@ -213,5 +284,18 @@
     document.getElementById('tourClose')?.addEventListener('click', tourHide);
     document.getElementById('btnTutorial')?.addEventListener('click', ()=> showStep(0));
     document.getElementById('startTour')?.addEventListener('click', ()=>{ document.getElementById('help')?.close(); showStep(0); });
+
+    // riposiziona se cambia viewport
+    ['resize','orientationchange','scroll'].forEach(ev=>{
+      window.addEventListener(ev, ()=>{ const cur = steps[idx]; if(cur){ const t=document.querySelector(cur.sel); if(t) placeHighlight(t); }}, {passive:true});
+    });
+  }
+
+  // ricarica pagina quando viene attivato un nuovo SW (opzionale, non invasivo)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // Evita loop: ricarica solo una volta
+      if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
+    });
   }
 })();
