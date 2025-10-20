@@ -1,4 +1,4 @@
-// app.js patch – annotazioni robuste + share + hook DC
+// app.js patch – annotazioni robuste + share + hook DC + TUTORIAL + PDF.js fix + Sync doc
 (() => {
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
@@ -6,13 +6,13 @@
 
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
-  $('#btnHelp').onclick=()=>$('#help').showModal(); $('#closeHelp').onclick=()=>$('#help').close();
+  $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal()); $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
 
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
   $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
     $$('.mode').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
     const m = btn.dataset.mode;
-    stdOnly.classList.toggle('hidden', m!=='standard'); gOnly.classList.toggle('hidden', m!=='glasses'); mOnly.classList.toggle('hidden', m!=='mobile');
+    stdOnly?.classList.toggle('hidden', m!=='standard'); gOnly?.classList.toggle('hidden', m!=='glasses'); mOnly?.classList.toggle('hidden', m!=='mobile');
   }));
 
   const cameraSelect=$('#cameraSelect'), videoGrid=$('#videoGrid'), micToggle=$('#micToggle');
@@ -99,21 +99,39 @@
             if(m.evt==='up') last=null;
           }
           if(m.t==='annoImage'){ /* opzionale: window.open(m.data,'_blank'); */ }
+          if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
+          if(m.t==='cursor'){ const rc=document.getElementById('remoteCursor'); if(rc){ rc.classList.remove('hidden'); const rect=document.querySelector('.docWrap').getBoundingClientRect(); rc.style.left=(m.nx*rect.width)+'px'; rc.style.top=(m.ny*rect.height)+'px'; } }
         }catch{}
       });
     };
   }
   initAnnotations();
 
-  // ------- Laser + documenti (rimane com'era, minimale qui) -------
+  // ------- Laser + documenti (+ PDF.js fix + Sync) -------
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
   $('#btnLaser')?.addEventListener('click', ()=>{ laser=!laser; $('#btnLaser').textContent=laser?'Laser OFF':'Laser ON'; overlay && (overlay.style.pointerEvents = laser?'auto':'none'); lCursor?.classList.toggle('hidden', !laser); });
   function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
   overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
-  $('#btnPdfJs')?.addEventListener('click', ()=>{ const url=docFrame.src; const isLocal=url.includes('/docs/')||url.endsWith('sample.pdf'); if(!isLocal){ alert('Per PDF.js usa file in /docs del repo (no blob).'); return; } const viewer='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/web/viewer.html?file='+encodeURIComponent(url); docFrame.src=viewer; appendChat('Aperto con PDF.js (CDN)','sys'); });
-  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); docFrame.src=url; sendData({t:'doc', name:f.name}); });
+
+  // PDF.js: usa viewer ufficiale Mozilla per evitare problemi di CDN
+  $('#btnPdfJs')?.addEventListener('click', ()=>{
+    const url = docFrame?.src || '';
+    const viewer = 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(url);
+    if(docFrame) docFrame.src = viewer;
+    appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
+  });
+
+  // file picker: carica e invia URL al remoto
+  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); });
+
+  // Sync vista → remoto: invia l'URL attuale del documento (compatibile cross-origin)
+  $('#btnSync')?.addEventListener('click', ()=>{
+    const url = docFrame?.src || '';
+    if(url) sendData({t:'docOpen', url});
+    appendChat('Sync inviato (document URL)','sys');
+  });
 
   // --------- WebRTC base + GitHub Issues (ridotto) ---------
   let pc=null, dc=null;
@@ -134,4 +152,45 @@
   document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
   document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{ try{ const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } });
 
+  // ---------- Tutorial interattivo (Avvia guida) ----------
+  const tourEl = document.getElementById('tour');
+  if (tourEl){
+    const highlight = document.createElement('div'); highlight.className = 'tour-highlight'; tourEl.appendChild(highlight);
+    const stepEl = tourEl.querySelector('.tour-step');
+    const steps = [
+      {sel:'.modes', text:'Scegli la modalità: Standard, Smart Glasses o Mobile Cam.'},
+      {sel:'.tab[data-tab="signal"]', text:'Vai nella tab “Segnaling” per collegarti.'},
+      {sel:'#btnMakeOffer', text:'Tecnico: premi “Genera Offerta” e copia il JSON.'},
+      {sel:'#sdpBox', text:'Incolla qui l’Offerta/Risposta.'},
+      {sel:'#btnMakeAnswer', text:'Esperto: crea la Risposta, poi inviala.'},
+      {sel:'#btnApplyAnswer', text:'Tecnico: applica la Risposta — connessi.'},
+      {sel:'#btnLaser', text:'Usa Laser e Annotazioni per guidare il lavoro.'}
+    ];
+    let idx=0;
+    function placeHighlight(target){
+      const r=target.getBoundingClientRect();
+      highlight.style.position='fixed';
+      highlight.style.left=(r.left-6)+'px'; highlight.style.top=(r.top-6)+'px';
+      highlight.style.width=(r.width+12)+'px'; highlight.style.height=(r.height+12)+'px';
+      const pop = tourEl.querySelector('.tour-pop');
+      const px=Math.min(window.innerWidth-380, Math.max(16, r.right+16));
+      const py=Math.min(window.innerHeight-160, Math.max(16, r.top));
+      pop.style.left=px+'px'; pop.style.top=py+'px';
+    }
+    function showStep(i){
+      idx=i;
+      const s=steps[idx];
+      const target=document.querySelector(s.sel);
+      stepEl.textContent = s.text;
+      if(target) placeHighlight(target);
+      tourEl.classList.remove('hidden');
+    }
+    function next(){ if(idx<steps.length-1) showStep(idx+1); else tourEl.classList.add('hidden'); }
+    function prev(){ if(idx>0) showStep(idx-1); }
+    document.getElementById('tourNext')?.addEventListener('click', next);
+    document.getElementById('tourPrev')?.addEventListener('click', prev);
+    document.getElementById('tourClose')?.addEventListener('click', ()=>tourEl.classList.add('hidden'));
+    document.getElementById('btnTutorial')?.addEventListener('click', ()=> showStep(0));
+    document.getElementById('startTour')?.addEventListener('click', ()=>{ document.getElementById('help')?.close(); showStep(0); });
+  }
 })();
