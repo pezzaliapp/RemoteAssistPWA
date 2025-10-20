@@ -1,4 +1,4 @@
-// Remote Assist — MultiCam (GH + Laser + Glasses) — app.js v1.3
+// Remote Assist — MultiCam (Mobile Cam) — app.js v1.0
 (() => {
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
@@ -14,7 +14,47 @@
   const sdpBox=$('#sdpBox');
   const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
 
-  // Media devices
+  // Rear camera (Mobile Cam Mode)
+  const btnRearCam=$('#btnRearCam'), btnTorch=$('#btnTorch'), btnFullscreen=$('#btnFullscreen'), btnLock=$('#btnLock');
+  let rearStream=null, rearTrack=null, imageCapture=null, torch=false;
+  async function startRearCam(){
+    try{
+      rearStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: 'environment' }, width: {ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} },
+        audio: micToggle.checked
+      });
+    }catch{
+      // fallback senza exact
+      rearStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: {ideal:1280}, height:{ideal:720} },
+        audio: micToggle.checked
+      });
+    }
+    addTile(rearStream, 'mobile-cam');
+    if(pc) rearStream.getTracks().forEach(t=>pc.addTrack(t, rearStream));
+    rearTrack = rearStream.getVideoTracks()[0];
+    try{ imageCapture = new ImageCapture(rearTrack); }catch{ imageCapture = null; }
+  }
+  btnRearCam.onclick = startRearCam;
+
+  btnTorch.onclick = async ()=>{
+    torch = !torch;
+    btnTorch.textContent = torch ? 'Torch OFF' : 'Torch ON';
+    if(!rearTrack) return;
+    try{
+      await rearTrack.applyConstraints({ advanced: [{ torch }] });
+    }catch(e){ console.warn('Torch non supportata', e); }
+  };
+
+  btnFullscreen.onclick = async ()=>{
+    const el = document.documentElement;
+    try{ await (el.requestFullscreen?.() || el.webkitRequestFullscreen?.()); }catch{}
+  };
+  btnLock.onclick = async ()=>{
+    try{ await screen.orientation.lock('landscape'); }catch(e){ console.warn('Orientation lock non supportato', e); }
+  };
+
+  // Devices list
   async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
   async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
   function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
@@ -32,7 +72,7 @@
   function sendData(o){ dc?.readyState==='open' && dc.send(JSON.stringify(o)); }
   function sendChat(text){ if(!text) return; appendChat(text,'me'); sendData({t:'chat',text}); }
 
-  // Annotazioni
+  // Annotazioni + Laser
   const canvas=$('#annoCanvas'), ctx=canvas.getContext('2d'); let drawing=false, mode='pen';
   const penBtn=$('#pen'), eraserBtn=$('#eraser'), clearBtn=$('#clear'), thick=$('#thick');
   function resizeCanvas(){ canvas.width=canvas.clientWidth; canvas.height=canvas.clientHeight; } window.addEventListener('resize',resizeCanvas); resizeCanvas();
@@ -43,7 +83,6 @@
   window.addEventListener('pointerup', ()=>{ if(drawing){ drawing=false; sendData({t:'anno',evt:'up'})}});
   penBtn.onclick=()=>mode='pen'; eraserBtn.onclick=()=>mode='eraser'; clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}) };
 
-  // Documenti + Laser
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), rCursor=$('#remoteCursor'), lCursor=$('#localCursor');
   let laser=false;
@@ -53,41 +92,6 @@
   $('#btnSync').onclick=()=> sendData({t:'docSync', scroll: docFrame.contentWindow?.scrollY || 0});
   $('#btnPdfJs').onclick=()=>{ const url=docFrame.src; const isLocal=url.includes('/docs/')||url.endsWith('sample.pdf'); if(!isLocal){ alert('Per PDF.js usa file in /docs del repo (no blob).'); return; } const viewer='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/web/viewer.html?file='+encodeURIComponent(url); docFrame.src=viewer; appendChat('Aperto con PDF.js (CDN)','sys'); };
   filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); docFrame.src=url; sendData({t:'doc', name:f.name}); };
-
-  // --- Smart Glasses Mode ---
-  const btBtn=$('#btnBtBattery'), btStatus=$('#btStatus'), audioOut=$('#audioOut'), applySink=$('#applySink'), sinkInfo=$('#sinkInfo');
-  let sinkReady=false;
-  async function loadSinks(){
-    if(!('mediaDevices' in navigator) || !('enumerateDevices' in navigator.mediaDevices)) { sinkInfo.textContent='Uscita audio: enumerateDevices non disponibile.'; return; }
-    const list=await navigator.mediaDevices.enumerateDevices();
-    const outs=list.filter(d=>d.kind==='audiooutput');
-    audioOut.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Uscita audio'}</option>`).join('');
-    sinkReady = ('setSinkId' in HTMLMediaElement.prototype);
-    sinkInfo.textContent = sinkReady ? 'Puoi selezionare un’uscita audio compatibile (non supportato su iOS).' : 'Cambio uscita non supportato su questo browser.';
-  }
-  loadSinks();
-  applySink.onclick = ()=>{
-    if(!sinkReady){ alert('Cambio uscita non supportato su questo browser.'); return; }
-    const id = audioOut.value;
-    $$('#videoGrid video').forEach(v=>{ if(v.setSinkId) try{ v.setSinkId(id); }catch(e){} });
-  };
-
-  btBtn.onclick = async ()=>{
-    try{
-      const dev = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['battery_service','device_information']});
-      btStatus.textContent = 'Connesso a '+(dev.name||'device');
-      const server = await dev.gatt.connect();
-      try{
-        const svc = await server.getPrimaryService('battery_service');
-        const ch = await svc.getCharacteristic('battery_level');
-        const val = await ch.readValue(); const lvl = val.getUint8(0);
-        btStatus.textContent += ' — Batteria: '+lvl+'%';
-      }catch{ btStatus.textContent += ' — Batteria non esposta'; }
-      dev.ongattserverdisconnected = ()=> btStatus.textContent='Disconnesso';
-    }catch(e){
-      btStatus.textContent = 'Connessione fallita o non supportata';
-    }
-  };
 
   // --- WebRTC (manual / GitHub Issues) ---
   let pc=null, dc=null;

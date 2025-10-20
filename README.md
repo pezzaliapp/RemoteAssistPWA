@@ -1,11 +1,9 @@
-# Remote Assist — MultiCam (PWA · GitHub-Only) — Smart Glasses Mode
+# Remote Assist — MultiCam (PWA · GitHub-Only) — Mobile Cam Mode
 
-Questa build aggiunge la **Smart Glasses Mode**:
-- Uso come **dispositivo audio/microfono** (pairing Bluetooth a livello di sistema).
-- **Web Bluetooth** per leggere la **batteria** (`battery_service`, se esposto).
-- Se supportato, **selezione uscita audio** (`setSinkId`; non su iOS).
+Usa il **telefono** come videocamera “head-mounted”:
+- Avvio **camera posteriore** con preferenza 1280×720 @30fps
+- **Torch** ON/OFF (se supportato)
+- **Fullscreen** e tentativo di **orientation lock** (dipende dal browser)
+- Stream inviato alla sessione WebRTC (Manuale o GitHub Issues)
 
-Restano inclusi: Laser pointer sincronizzato, Annotazioni, PDF.js (CDN), Chat, Registrazione,
-Signaling Manuale e via GitHub Issues (beta).
-
-**Nota:** molti occhiali Bluetooth non espongono video UVC. Per video “head-mounted” serve una cam UVC o la cam del telefono.
+Resta tutto il resto: Laser, Annotazioni, PDF.js (CDN), Chat, Registrazione, multi-camera.

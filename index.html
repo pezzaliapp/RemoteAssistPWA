@@ -15,7 +15,7 @@
   <header>
     <div class="brand">
       <img src="icons/icon-192.png" alt="" width="24" height="24">
-      <strong>Remote Assist — MultiCam</strong><span class="tag">GitHub-Only</span>
+      <strong>Remote Assist — MultiCam</strong><span class="tag">Mobile Cam</span>
     </div>
     <nav>
       <button id="btnInstall" hidden>Installa</button>
@@ -33,7 +33,7 @@
             <option value="expert">Esperto remoto</option>
           </select>
         </label>
-        <label>Modalità di segnalazione (signaling):
+        <label>Segnaling:
           <select id="sigMode">
             <option value="manual">Manuale (copia/incolla)</option>
             <option value="github">GitHub Issues (beta)</option>
@@ -45,15 +45,25 @@
         </div>
       </div>
 
+      <div class="card mobilecam">
+        <h2>Modalità Mobile Cam (telefono come “head cam”)</h2>
+        <div class="row">
+          <button id="btnRearCam">Avvia camera posteriore</button>
+          <button id="btnTorch">Torch ON</button>
+          <button id="btnFullscreen">Fullscreen</button>
+          <button id="btnLock">Blocca orientamento</button>
+        </div>
+        <small>Usa una fascia/clip per fissare il telefono. La cam viene inviata nella sessione WebRTC.</small>
+      </div>
+
       <div class="card devices">
-        <h2>Sorgenti Video</h2>
+        <h2>Altre Sorgenti Video</h2>
         <div class="row">
           <select id="cameraSelect"></select>
           <button id="btnAddCam">Aggiungi</button>
           <button id="btnStopAll">Stop</button>
           <label class="inline"><input type="checkbox" id="micToggle" checked> Microfono</label>
         </div>
-        <small>Funziona con occhiali/webcam compatibili <b>UVC</b> viste dal browser come videoinput.</small>
       </div>
 
       <div class="card grid" id="videoGrid"></div>
@@ -64,22 +74,6 @@
           <button id="btnRec">Avvia Rec</button>
           <a id="downloadRec" class="hidden">Scarica</a>
         </div>
-      </div>
-
-      <div class="card glasses">
-        <h2>Smart Glasses Mode</h2>
-        <p>Per occhiali Bluetooth (audio/mic): abbinali dal sistema. Qui puoi leggere la <b>batteria</b> via Web Bluetooth (se esposta) e scegliere l’<b>uscita audio</b> (se supportata dal browser).</p>
-        <div class="row">
-          <button id="btnBtBattery">Connetti (Web Bluetooth)</button>
-          <span id="btStatus" class="muted">Non connesso</span>
-        </div>
-        <div class="row">
-          <label>Uscita audio:
-            <select id="audioOut"></select>
-          </label>
-          <button id="applySink">Applica</button>
-        </div>
-        <small id="sinkInfo" class="muted"></small>
       </div>
     </section>
 
@@ -131,7 +125,7 @@
       </div>
 
       <div class="panel hidden" id="panel-signal">
-        <h3>Signaling manuale (senza server) — copia/incolla</h3>
+        <h3>Signaling manuale — copia/incolla</h3>
         <div class="row">
           <button id="btnMakeOffer">Genera Offerta</button>
           <button id="btnMakeAnswer">Crea Risposta da Offerta</button>
@@ -141,7 +135,7 @@
           <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
         </label>
         <div class="muted">
-          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” postando commenti con <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede token.</p>
+          <p><b>GitHub Issues (beta)</b>: usa un issue come “stanza”.</p>
           <div id="ghBox2">
             <div class="row">
               <input id="ghRepo" placeholder="owner/repo">
@@ -161,12 +155,12 @@
   </main>
 
   <dialog id="help">
-    <h3>Guida rapida</h3>
+    <h3>Guida rapido-telefono</h3>
     <ol>
-      <li>ABBINA gli <b>occhiali Bluetooth</b> dalle impostazioni di sistema (per audio/mic).</li>
-      <li>Tab <b>Documenti</b> → <b>Laser ON</b> per il puntatore sincronizzato.</li>
-      <li>Opzionale: <b>Connetti (Web Bluetooth)</b> per leggere la batteria (se supportata).</li>
-      <li>Tab <b>Segnaling</b>: Manuale o GitHub Issues per collegare i peer.</li>
+      <li>Fissa il <b>telefono</b> alla testa o al petto con una fascia/clip.</li>
+      <li>Premi <b>Avvia camera posteriore</b>. Se serve luce, usa <b>Torch ON</b>.</li>
+      <li>Vai in <b>Segnaling</b> per collegarti con l’esperto.</li>
+      <li>Usa <b>Laser</b> e <b>Annotazioni</b> per indicazioni “chirurgiche”.</li>
     </ol>
     <button id="closeHelp">Chiudi</button>
   </dialog>
