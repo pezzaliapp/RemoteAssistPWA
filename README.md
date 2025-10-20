@@ -1,9 +1,9 @@
-# Remote Assist — MultiCam (PWA · GitHub-Only) — Mobile Cam Mode
+# Remote Assist — SUITE (GitHub Pages)
 
-Usa il **telefono** come videocamera “head-mounted”:
-- Avvio **camera posteriore** con preferenza 1280×720 @30fps
-- **Torch** ON/OFF (se supportato)
-- **Fullscreen** e tentativo di **orientation lock** (dipende dal browser)
-- Stream inviato alla sessione WebRTC (Manuale o GitHub Issues)
+Modalità incluse:
+- **Standard**: Multi-camera, Documenti, Laser, Annotazioni, PDF.js (CDN)
+- **Smart Glasses**: Web Bluetooth (batteria), scelta uscita audio (se supportata)
+- **Mobile Cam**: camera posteriore, torch, fullscreen, blocco orientamento
 
-Resta tutto il resto: Laser, Annotazioni, PDF.js (CDN), Chat, Registrazione, multi-camera.
+Signaling: Manuale (copia/incolla) o GitHub Issues (beta).  
+Installabile come PWA, offline per l'app-shell.

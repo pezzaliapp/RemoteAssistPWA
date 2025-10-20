@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1022">
-  <title>Remote Assist — MultiCam (PWA · GitHub Pages)</title>
+  <title>Remote Assist — SUITE (PWA · GitHub Pages)</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
   <header>
     <div class="brand">
       <img src="icons/icon-192.png" alt="" width="24" height="24">
-      <strong>Remote Assist — MultiCam</strong><span class="tag">Mobile Cam</span>
+      <strong>Remote Assist — SUITE</strong><span class="tag">GitHub-Only</span>
     </div>
     <nav>
       <button id="btnInstall" hidden>Installa</button>
@@ -24,9 +24,16 @@
   </header>
 
   <main>
-    <section class="left">
+    <aside class="sidebar">
+      <h3>Modalità</h3>
+      <div class="modes">
+        <button class="mode active" data-mode="standard">Standard</button>
+        <button class="mode" data-mode="glasses">Smart Glasses</button>
+        <button class="mode" data-mode="mobile">Mobile Cam</button>
+      </div>
+
       <div class="card controls">
-        <h2>Sessione</h2>
+        <h3>Sessione</h3>
         <label>Ruolo:
           <select id="role">
             <option value="tech">Tecnico sul campo</option>
@@ -45,39 +52,55 @@
         </div>
       </div>
 
-      <div class="card mobilecam">
-        <h2>Modalità Mobile Cam (telefono come “head cam”)</h2>
-        <div class="row">
-          <button id="btnRearCam">Avvia camera posteriore</button>
-          <button id="btnTorch">Torch ON</button>
-          <button id="btnFullscreen">Fullscreen</button>
-          <button id="btnLock">Blocca orientamento</button>
-        </div>
-        <small>Usa una fascia/clip per fissare il telefono. La cam viene inviata nella sessione WebRTC.</small>
-      </div>
-
-      <div class="card devices">
-        <h2>Altre Sorgenti Video</h2>
+      <div class="card devices std-only">
+        <h3>Sorgenti Video</h3>
         <div class="row">
           <select id="cameraSelect"></select>
           <button id="btnAddCam">Aggiungi</button>
           <button id="btnStopAll">Stop</button>
           <label class="inline"><input type="checkbox" id="micToggle" checked> Microfono</label>
         </div>
+        <small>UVC/occhiali UVC, o qualsiasi webcam compatibile.</small>
+      </div>
+
+      <div class="card glasses-only hidden">
+        <h3>Smart Glasses Mode</h3>
+        <div class="row">
+          <button id="btnBtBattery">Connetti (Web Bluetooth)</button>
+          <span id="btStatus" class="muted">Non connesso</span>
+        </div>
+        <div class="row">
+          <label>Uscita audio:
+            <select id="audioOut"></select>
+          </label>
+          <button id="applySink">Applica</button>
+        </div>
+        <small id="sinkInfo" class="muted"></small>
+      </div>
+
+      <div class="card mobile-only hidden">
+        <h3>Mobile Cam</h3>
+        <div class="row">
+          <button id="btnRearCam">Avvia posteriore</button>
+          <button id="btnTorch">Torch ON</button>
+          <button id="btnFullscreen">Fullscreen</button>
+          <button id="btnLock">Blocca orientamento</button>
+        </div>
+        <small>Fissa il telefono per POV stabile.</small>
       </div>
 
       <div class="card grid" id="videoGrid"></div>
 
       <div class="card record">
-        <h2>Registrazione</h2>
+        <h3>Registrazione</h3>
         <div class="row">
           <button id="btnRec">Avvia Rec</button>
           <a id="downloadRec" class="hidden">Scarica</a>
         </div>
       </div>
-    </section>
+    </aside>
 
-    <section class="right">
+    <section class="content">
       <div class="tabs">
         <button class="tab active" data-tab="docs">Documenti</button>
         <button class="tab" data-tab="annotate">Annotazioni</button>
@@ -125,7 +148,7 @@
       </div>
 
       <div class="panel hidden" id="panel-signal">
-        <h3>Signaling manuale — copia/incolla</h3>
+        <h3>Signaling manuale (copia/incolla)</h3>
         <div class="row">
           <button id="btnMakeOffer">Genera Offerta</button>
           <button id="btnMakeAnswer">Crea Risposta da Offerta</button>
@@ -135,7 +158,7 @@
           <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
         </label>
         <div class="muted">
-          <p><b>GitHub Issues (beta)</b>: usa un issue come “stanza”.</p>
+          <p><b>GitHub Issues (beta)</b>: usa un issue come stanza e scambia OFFER/ANSWER nei commenti.</p>
           <div id="ghBox2">
             <div class="row">
               <input id="ghRepo" placeholder="owner/repo">
@@ -155,12 +178,11 @@
   </main>
 
   <dialog id="help">
-    <h3>Guida rapido-telefono</h3>
+    <h3>Guida rapida</h3>
     <ol>
-      <li>Fissa il <b>telefono</b> alla testa o al petto con una fascia/clip.</li>
-      <li>Premi <b>Avvia camera posteriore</b>. Se serve luce, usa <b>Torch ON</b>.</li>
-      <li>Vai in <b>Segnaling</b> per collegarti con l’esperto.</li>
-      <li>Usa <b>Laser</b> e <b>Annotazioni</b> per indicazioni “chirurgiche”.</li>
+      <li>Scegli la modalità: <b>Standard</b>, <b>Smart Glasses</b> o <b>Mobile Cam</b>.</li>
+      <li>Usa la tab <b>Segnaling</b> per collegarti (Manuale o GitHub Issues).</li>
+      <li>Con <b>Laser</b> e <b>Annotazioni</b> guidi l’intervento “chirurgico”.</li>
     </ol>
     <button id="closeHelp">Chiudi</button>
   </dialog>

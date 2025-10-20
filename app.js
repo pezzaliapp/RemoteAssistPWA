@@ -1,65 +1,37 @@
-// Remote Assist — MultiCam (Mobile Cam) — app.js v1.0
+// Remote Assist — SUITE — app.js
 (() => {
+  // PWA install
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
   btnInstall?.addEventListener('click', ()=>{ deferredPrompt?.prompt(); deferredPrompt=null; btnInstall.hidden=true; });
 
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+
+  // Tabs
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
   $('#btnHelp').onclick=()=>$('#help').showModal(); $('#closeHelp').onclick=()=>$('#help').close();
 
+  // Mode switch
+  const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
+  $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
+    $$('.mode').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+    const m = btn.dataset.mode;
+    stdOnly.classList.toggle('hidden', m!=='standard');
+    gOnly.classList.toggle('hidden', m!=='glasses');
+    mOnly.classList.toggle('hidden', m!=='mobile');
+  }));
+
+  // Devices + WebRTC common
   const cameraSelect=$('#cameraSelect'), videoGrid=$('#videoGrid'), micToggle=$('#micToggle');
   const btnAddCam=$('#btnAddCam'), btnStopAll=$('#btnStopAll');
-  const btnJoin=$('#btnJoin'), btnLeave=$('#btnLeave');
-  const sdpBox=$('#sdpBox');
+  const btnJoin=$('#btnJoin'), btnLeave=$('#btnLeave'); const sdpBox=$('#sdpBox');
   const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
 
-  // Rear camera (Mobile Cam Mode)
-  const btnRearCam=$('#btnRearCam'), btnTorch=$('#btnTorch'), btnFullscreen=$('#btnFullscreen'), btnLock=$('#btnLock');
-  let rearStream=null, rearTrack=null, imageCapture=null, torch=false;
-  async function startRearCam(){
-    try{
-      rearStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' }, width: {ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} },
-        audio: micToggle.checked
-      });
-    }catch{
-      // fallback senza exact
-      rearStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: {ideal:1280}, height:{ideal:720} },
-        audio: micToggle.checked
-      });
-    }
-    addTile(rearStream, 'mobile-cam');
-    if(pc) rearStream.getTracks().forEach(t=>pc.addTrack(t, rearStream));
-    rearTrack = rearStream.getVideoTracks()[0];
-    try{ imageCapture = new ImageCapture(rearTrack); }catch{ imageCapture = null; }
-  }
-  btnRearCam.onclick = startRearCam;
-
-  btnTorch.onclick = async ()=>{
-    torch = !torch;
-    btnTorch.textContent = torch ? 'Torch OFF' : 'Torch ON';
-    if(!rearTrack) return;
-    try{
-      await rearTrack.applyConstraints({ advanced: [{ torch }] });
-    }catch(e){ console.warn('Torch non supportata', e); }
-  };
-
-  btnFullscreen.onclick = async ()=>{
-    const el = document.documentElement;
-    try{ await (el.requestFullscreen?.() || el.webkitRequestFullscreen?.()); }catch{}
-  };
-  btnLock.onclick = async ()=>{
-    try{ await screen.orientation.lock('landscape'); }catch(e){ console.warn('Orientation lock non supportato', e); }
-  };
-
-  // Devices list
   async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
-  async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
+  async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
   function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
   async function stopAll(){ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); videoGrid.innerHTML=''; }
-  btnAddCam.onclick=addCam; btnStopAll.onclick=stopAll; navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
+  btnAddCam?.addEventListener('click', addCam); btnStopAll?.addEventListener('click', stopAll); navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
 
   // Recorder
   let mediaRecorder, chunks=[];
@@ -93,16 +65,35 @@
   $('#btnPdfJs').onclick=()=>{ const url=docFrame.src; const isLocal=url.includes('/docs/')||url.endsWith('sample.pdf'); if(!isLocal){ alert('Per PDF.js usa file in /docs del repo (no blob).'); return; } const viewer='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/web/viewer.html?file='+encodeURIComponent(url); docFrame.src=viewer; appendChat('Aperto con PDF.js (CDN)','sys'); };
   filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); docFrame.src=url; sendData({t:'doc', name:f.name}); };
 
-  // --- WebRTC (manual / GitHub Issues) ---
-  let pc=null, dc=null;
-  function createPC(){
-    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}], iceCandidatePoolSize:1});
-    pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); };
-    pc.ondatachannel=e=>setupDC(e.channel);
-    dc=pc.createDataChannel('ra'); setupDC(dc);
-    $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject)));
+  // Mobile cam specifics
+  const btnRearCam=$('#btnRearCam'), btnTorch=$('#btnTorch'), btnFullscreen=$('#btnFullscreen'), btnLock=$('#btnLock');
+  let rearStream=null, rearTrack=null, torch=false;
+  async function startRearCam(){
+    try{
+      rearStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{exact:'environment'}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30} }, audio: micToggle?.checked });
+    }catch{
+      rearStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }, audio: micToggle?.checked });
+    }
+    addTile(rearStream,'mobile-cam'); if(pc) rearStream.getTracks().forEach(t=>pc.addTrack(t, rearStream));
+    rearTrack = rearStream.getVideoTracks()[0];
   }
-  function setupDC(ch){ dc=ch; dc.onopen=()=>appendChat('(canale dati aperto)','sys'); dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); if(m.t==='anno'){ if(m.evt==='clear') ctx.clearRect(0,0,canvas.width,canvas.height); if(m.evt==='down'||m.evt==='move'){ const p=m.payload; const prev=mode,th0=thick.value; mode=p.mode; thick.value=p.th; drawDot(p.x,p.y); mode=prev; thick.value=th0; } } if(m.t==='cursor'){ rCursor.classList.remove('hidden'); posCursor(rCursor, m.nx, m.ny); } if(m.t==='docSync'){ /* hook scroll */ } }catch{} }; }
+  btnRearCam?.addEventListener('click', startRearCam);
+  btnTorch?.addEventListener('click', async ()=>{ torch=!torch; btnTorch.textContent=torch?'Torch OFF':'Torch ON'; if(!rearTrack) return; try{ await rearTrack.applyConstraints({advanced:[{torch}]}); }catch(e){} });
+  btnFullscreen?.addEventListener('click', async ()=>{ const el=document.documentElement; try{ await (el.requestFullscreen?.()||el.webkitRequestFullscreen?.()); }catch{} });
+  btnLock?.addEventListener('click', async ()=>{ try{ await screen.orientation.lock('landscape'); }catch(e){} });
+
+  // Smart Glasses specifics
+  const btBtn=$('#btnBtBattery'), btStatus=$('#btStatus'), audioOut=$('#audioOut'), applySink=$('#applySink'), sinkInfo=$('#sinkInfo');
+  let sinkReady=false;
+  async function loadSinks(){ if(!navigator.mediaDevices?.enumerateDevices){ sinkInfo.textContent='Uscita audio: enumerateDevices non disponibile.'; return; } const list=await navigator.mediaDevices.enumerateDevices(); const outs=list.filter(d=>d.kind==='audiooutput'); audioOut.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Uscita audio'}</option>`).join(''); sinkReady = ('setSinkId' in HTMLMediaElement.prototype); sinkInfo.textContent = sinkReady ? 'Puoi selezionare un’uscita audio compatibile (non iOS).' : 'Cambio uscita non supportato su questo browser.'; }
+  loadSinks();
+  applySink?.addEventListener('click', ()=>{ if(!sinkReady){ alert('Cambio uscita non supportato su questo browser.'); return; } const id=audioOut.value; $$('#videoGrid video').forEach(v=>{ if(v.setSinkId) try{ v.setSinkId(id); }catch(e){} }); });
+  btBtn?.addEventListener('click', async ()=>{ try{ const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['battery_service','device_information']}); btStatus.textContent='Connesso a '+(dev.name||'device'); const server=await dev.gatt.connect(); try{ const svc=await server.getPrimaryService('battery_service'); const ch=await svc.getCharacteristic('battery_level'); const val=await ch.readValue(); const lvl=val.getUint8(0); btStatus.textContent+=' — Batteria: '+lvl+'%'; }catch{ btStatus.textContent+=' — Batteria non esposta'; } dev.ongattserverdisconnected=()=> btStatus.textContent='Disconnesso'; }catch(e){ btStatus.textContent='Connessione fallita o non supportata'; } });
+
+  // WebRTC core + GitHub Issues signaling
+  let pc=null, dc=null;
+  function createPC(){ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}], iceCandidatePoolSize:1}); pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); }; pc.ondatachannel=e=>setupDC(e.channel); dc=pc.createDataChannel('ra'); setupDC(dc); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject))); }
+  function setupDC(ch){ dc=ch; dc.onopen=()=>appendChat('(canale dati aperto)','sys'); dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); if(m.t==='anno'){ if(m.evt==='clear') ctx.clearRect(0,0,canvas.width,canvas.height); if(m.evt==='down'||m.evt==='move'){ const p=m.payload; const prev=mode,th0=thick.value; mode=p.mode; thick.value=p.th; drawDot(p.x,p.y); mode=prev; thick.value=th0; } } if(m.t==='cursor'){ $('#remoteCursor').classList.remove('hidden'); const nx=m.nx,ny=m.ny; const rect=$('.docWrap').getBoundingClientRect(); $('#remoteCursor').style.left=(nx*rect.width)+'px'; $('#remoteCursor').style.top=(ny*rect.height)+'px'; } if(m.t==='docSync'){ /* hook scroll */ } }catch{} }; }
   async function waitIce(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(pc.localDescription); pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); }; }); }
   async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
   async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }

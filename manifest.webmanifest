@@ -1,6 +1,6 @@
 {
-  "name": "Remote Assist — MultiCam",
-  "short_name": "Remote Assist",
+  "name": "Remote Assist — SUITE",
+  "short_name": "RA Suite",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1022",
