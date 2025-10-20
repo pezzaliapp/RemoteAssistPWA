@@ -1,4 +1,4 @@
-// Remote Assist — MultiCam (GitHub-Only + Laser) — app.js v1.2
+// Remote Assist — MultiCam (GH + Laser + Glasses) — app.js v1.3
 (() => {
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
@@ -11,7 +11,6 @@
   const cameraSelect=$('#cameraSelect'), videoGrid=$('#videoGrid'), micToggle=$('#micToggle');
   const btnAddCam=$('#btnAddCam'), btnStopAll=$('#btnStopAll');
   const btnJoin=$('#btnJoin'), btnLeave=$('#btnLeave');
-  const roleSel=$('#role'), sigModeSel=$('#sigMode');
   const sdpBox=$('#sdpBox');
   const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
 
@@ -49,26 +48,48 @@
   const overlay=$('#cursorOverlay'), rCursor=$('#remoteCursor'), lCursor=$('#localCursor');
   let laser=false;
   $('#btnLaser').onclick=()=>{ laser=!laser; $('#btnLaser').textContent=laser?'Laser OFF':'Laser ON'; overlay.style.pointerEvents = laser ? 'auto' : 'none'; lCursor.classList.toggle('hidden', !laser); };
-  function posCursor(el, nx, ny){ const rect=el.getBoundingClientRect(); el.style.left = (nx*rect.width)+'px'; el.style.top = (ny*rect.height)+'px'; }
-  overlay.addEventListener('pointermove', e=>{ if(!laser) return; const rect=overlay.getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
-  // sync view button (scroll position)
+  function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left = (nx*rect.width)+'px'; el.style.top = (ny*rect.height)+'px'; }
+  overlay.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
   $('#btnSync').onclick=()=> sendData({t:'docSync', scroll: docFrame.contentWindow?.scrollY || 0});
-  // PDF.js (CDN) launcher
-  $('#btnPdfJs').onclick=()=>{
-    try{
-      const url = docFrame.src;
-      const isLocalDocs = url.includes('/docs/') || url.endsWith('sample.pdf');
-      const fileParam = isLocalDocs ? url : ''; // CDN viewer non può leggere blob: serve file servito via HTTP
-      if(!fileParam){ alert('Per aprire con PDF.js, carica un PDF nella cartella /docs del repo.'); return; }
-      const viewer = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/web/viewer.html?file=' + encodeURIComponent(fileParam);
-      docFrame.src = viewer;
-      sendChat('Aperto con PDF.js (CDN).');
-    }catch(e){ console.warn(e); }
-  };
-  // load file
+  $('#btnPdfJs').onclick=()=>{ const url=docFrame.src; const isLocal=url.includes('/docs/')||url.endsWith('sample.pdf'); if(!isLocal){ alert('Per PDF.js usa file in /docs del repo (no blob).'); return; } const viewer='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/web/viewer.html?file='+encodeURIComponent(url); docFrame.src=viewer; appendChat('Aperto con PDF.js (CDN)','sys'); };
   filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); docFrame.src=url; sendData({t:'doc', name:f.name}); };
 
-  // --- WebRTC (signaling manuale / GitHub Issues) ---
+  // --- Smart Glasses Mode ---
+  const btBtn=$('#btnBtBattery'), btStatus=$('#btStatus'), audioOut=$('#audioOut'), applySink=$('#applySink'), sinkInfo=$('#sinkInfo');
+  let sinkReady=false;
+  async function loadSinks(){
+    if(!('mediaDevices' in navigator) || !('enumerateDevices' in navigator.mediaDevices)) { sinkInfo.textContent='Uscita audio: enumerateDevices non disponibile.'; return; }
+    const list=await navigator.mediaDevices.enumerateDevices();
+    const outs=list.filter(d=>d.kind==='audiooutput');
+    audioOut.innerHTML = outs.map(d=>`<option value="${d.deviceId}">${d.label||'Uscita audio'}</option>`).join('');
+    sinkReady = ('setSinkId' in HTMLMediaElement.prototype);
+    sinkInfo.textContent = sinkReady ? 'Puoi selezionare un’uscita audio compatibile (non supportato su iOS).' : 'Cambio uscita non supportato su questo browser.';
+  }
+  loadSinks();
+  applySink.onclick = ()=>{
+    if(!sinkReady){ alert('Cambio uscita non supportato su questo browser.'); return; }
+    const id = audioOut.value;
+    $$('#videoGrid video').forEach(v=>{ if(v.setSinkId) try{ v.setSinkId(id); }catch(e){} });
+  };
+
+  btBtn.onclick = async ()=>{
+    try{
+      const dev = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['battery_service','device_information']});
+      btStatus.textContent = 'Connesso a '+(dev.name||'device');
+      const server = await dev.gatt.connect();
+      try{
+        const svc = await server.getPrimaryService('battery_service');
+        const ch = await svc.getCharacteristic('battery_level');
+        const val = await ch.readValue(); const lvl = val.getUint8(0);
+        btStatus.textContent += ' — Batteria: '+lvl+'%';
+      }catch{ btStatus.textContent += ' — Batteria non esposta'; }
+      dev.ongattserverdisconnected = ()=> btStatus.textContent='Disconnesso';
+    }catch(e){
+      btStatus.textContent = 'Connessione fallita o non supportata';
+    }
+  };
+
+  // --- WebRTC (manual / GitHub Issues) ---
   let pc=null, dc=null;
   function createPC(){
     pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}], iceCandidatePoolSize:1});
@@ -84,7 +105,6 @@
   async function applyAnswer(){ const ans=JSON.parse(sdpBox.value||'{}'); await pc.setRemoteDescription(ans); }
   $('#btnMakeOffer').onclick=makeOffer; $('#btnMakeAnswer').onclick=makeAnswerFromOffer; $('#btnApplyAnswer').onclick=applyAnswer;
 
-  // GitHub Issues (beta)
   function logGH(s){ ghLog.value+=(s+'\n'); ghLog.scrollTop=ghLog.scrollHeight; }
   async function ghFetch(path, opts={}){ const tok=ghToken.value.trim(); if(!tok) throw new Error('Token mancante'); const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts}); const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; } }
   function repoParts(){ const [owner,repo]=ghRepo.value.split('/'); return {owner,repo}; }

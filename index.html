@@ -39,18 +39,6 @@
             <option value="github">GitHub Issues (beta)</option>
           </select>
         </label>
-        <div id="ghBox" class="hidden">
-          <label>GitHub Repo (owner/name):
-            <input id="ghRepo" placeholder="pezzaliapp/remote-assist-signal">
-          </label>
-          <label>Issue # per la stanza:
-            <input id="ghIssue" placeholder="1">
-          </label>
-          <label>Token (scoped al repo): 
-            <input id="ghToken" type="password" placeholder="ghp_...">
-          </label>
-          <small>Il token resta nel tuo browser (localStorage). Puoi usare un issue privato.</small>
-        </div>
         <div class="row">
           <button id="btnJoin">Entra</button>
           <button id="btnLeave" disabled>Esci</button>
@@ -65,7 +53,7 @@
           <button id="btnStopAll">Stop</button>
           <label class="inline"><input type="checkbox" id="micToggle" checked> Microfono</label>
         </div>
-        <small>Funziona con occhiali/webcam compatibili <b>UVC</b> che il browser vede come videoinput.</small>
+        <small>Funziona con occhiali/webcam compatibili <b>UVC</b> viste dal browser come videoinput.</small>
       </div>
 
       <div class="card grid" id="videoGrid"></div>
@@ -78,14 +66,20 @@
         </div>
       </div>
 
-      <div class="card io">
-        <h2>Connettori HW (stub)</h2>
+      <div class="card glasses">
+        <h2>Smart Glasses Mode</h2>
+        <p>Per occhiali Bluetooth (audio/mic): abbinali dal sistema. Qui puoi leggere la <b>batteria</b> via Web Bluetooth (se esposta) e scegliere l’<b>uscita audio</b> (se supportata dal browser).</p>
         <div class="row">
-          <button id="btnSerial">WebSerial</button>
-          <button id="btnUSB">WebUSB</button>
-          <button id="btnBT">WebBluetooth</button>
+          <button id="btnBtBattery">Connetti (Web Bluetooth)</button>
+          <span id="btStatus" class="muted">Non connesso</span>
         </div>
-        <small>Attivabili via HTTPS. Da specializzare per i tuoi strumenti.</small>
+        <div class="row">
+          <label>Uscita audio:
+            <select id="audioOut"></select>
+          </label>
+          <button id="applySink">Applica</button>
+        </div>
+        <small id="sinkInfo" class="muted"></small>
       </div>
     </section>
 
@@ -147,7 +141,7 @@
           <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
         </label>
         <div class="muted">
-          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” pubblicando commenti con <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede token.</p>
+          <p><b>Opzione GitHub Issues (beta)</b>: usa un issue come “stanza” postando commenti con <code>[OFFER]</code> o <code>[ANSWER]</code>. Richiede token.</p>
           <div id="ghBox2">
             <div class="row">
               <input id="ghRepo" placeholder="owner/repo">
@@ -169,10 +163,10 @@
   <dialog id="help">
     <h3>Guida rapida</h3>
     <ol>
-      <li>Carica un <b>PDF/immagine</b> o usa il sample.</li>
-      <li>Usa <b>Laser ON</b> per mostrare un puntatore sincronizzato verso il remoto (chirurgico sui componenti).</li>
-      <li>Per PDF avanzato, clicca <b>Apri con PDF.js</b> (CDN). Se vuoi caching, aggiungeremo pdf.js nel repo.</li>
-      <li>Nella tab <b>Segnaling</b>, collega i peer con Manuale o GitHub Issues.</li>
+      <li>ABBINA gli <b>occhiali Bluetooth</b> dalle impostazioni di sistema (per audio/mic).</li>
+      <li>Tab <b>Documenti</b> → <b>Laser ON</b> per il puntatore sincronizzato.</li>
+      <li>Opzionale: <b>Connetti (Web Bluetooth)</b> per leggere la batteria (se supportata).</li>
+      <li>Tab <b>Segnaling</b>: Manuale o GitHub Issues per collegare i peer.</li>
     </ol>
     <button id="closeHelp">Chiudi</button>
   </dialog>
