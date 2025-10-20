@@ -118,6 +118,8 @@
   // PDF.js: usa viewer ufficiale Mozilla per evitare problemi di CDN
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
+    if(!url){ appendChat('Nessun documento aperto','sys'); return; }
+    if(url.startsWith('blob:')){ appendChat('PDF.js non può aprire file locali (blob). Metti il PDF in /docs o usa URL pubblico.','sys'); return; }
     const viewer = 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(url);
     if(docFrame) docFrame.src = viewer;
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
@@ -129,8 +131,11 @@
   // Sync vista → remoto: invia l'URL attuale del documento (compatibile cross-origin)
   $('#btnSync')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
-    if(url) sendData({t:'docOpen', url});
-    appendChat('Sync inviato (document URL)','sys');
+    if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.','sys'); return; }
+    if(!url){ appendChat('Nessun documento da sincronizzare.','sys'); return; }
+    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web. Metti il file in /docs o usa un link pubblico.','sys'); return; }
+    sendData({t:'docOpen', url});
+    appendChat('Sync inviato ✓','sys');
   });
 
   // --------- WebRTC base + GitHub Issues (ridotto) ---------
@@ -193,4 +198,14 @@
     document.getElementById('btnTutorial')?.addEventListener('click', ()=> showStep(0));
     document.getElementById('startTour')?.addEventListener('click', ()=>{ document.getElementById('help')?.close(); showStep(0); });
   }
+  // ---- Esci (chiusura sessione) ----
+  function leaveSession(){
+    try{ dc && dc.close(); }catch{}
+    try{ pc && pc.close(); }catch{}
+    pc=null; dc=null;
+    try{ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); }catch{}
+    appendChat('Hai lasciato la sessione.','sys');
+  }
+  document.getElementById('btnLeave')?.addEventListener('click', leaveSession);
+
 })();
