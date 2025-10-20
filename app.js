@@ -20,6 +20,13 @@
   const sdpBox=$('#sdpBox'); const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
   const live=$('.live-indicator');
 
+  function setLive(active){
+    if(!live) return;
+    live.classList.toggle('idle', !active);
+    live.classList.toggle('live', !!active);
+    live.title = active ? 'Assist in corso' : 'Inattivo';
+  }
+
   async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
   async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
   function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
@@ -119,6 +126,13 @@
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
     if(!url){ appendChat('Nessun documento aperto','sys'); return; }
+    if(url.toLowerCase().endswith && url.toLowerCase().endswith('.docx')){
+      if(url.startsWith('blob:')){ appendChat('DOCX locale (blob) non apribile dal viewer online. Metti il file in /docs o usa URL pubblico.','sys'); return; }
+      const office = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
+      if(docFrame) docFrame.src = office;
+      appendChat('Aperto DOCX con Office Web Viewer','sys');
+      return;
+    }
     if(url.startsWith('blob:')){ appendChat('PDF.js non può aprire file locali (blob). Metti il PDF in /docs o usa URL pubblico.','sys'); return; }
     const viewer = 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(url);
     if(docFrame) docFrame.src = viewer;
@@ -126,7 +140,7 @@
   });
 
   // file picker: carica e invia URL al remoto
-  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); });
+  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const isDocx = /\.docx$/i.test(f.name||''); const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); if(isDocx){ appendChat('DOCX caricato come file locale (blob). Per aprirlo nel viewer usa un URL web o metti il file in /docs e aprilo da lì.','sys'); } });
 
   // Sync vista → remoto: invia l'URL attuale del documento (compatibile cross-origin)
   $('#btnSync')?.addEventListener('click', ()=>{
@@ -141,7 +155,7 @@
   // --------- WebRTC base + GitHub Issues (ridotto) ---------
   let pc=null, dc=null;
   function createPC(){ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]}); pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); }; pc.ondatachannel=e=>setupDC(e.channel); dc=pc.createDataChannel('ra'); setupDC(dc); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject))); }
-  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle');}; dc.onclose=()=>{live?.classList.add('idle');}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} }; if(window.__setupDC__) window.__setupDC__(ch); }
+  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); setLive(true);}; dc.onclose=()=>{ setLive(false);}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} }; if(window.__setupDC__) window.__setupDC__(ch); }
   async function waitIce(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(pc.localDescription); pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); }; }); }
   async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
   async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
@@ -204,6 +218,7 @@
     try{ pc && pc.close(); }catch{}
     pc=null; dc=null;
     try{ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); }catch{}
+    setLive(false);
     appendChat('Hai lasciato la sessione.','sys');
   }
   document.getElementById('btnLeave')?.addEventListener('click', leaveSession);
