@@ -1,6 +1,5 @@
-// app.js — mobile toggle + vh fix + features
+// app.js — Modalità Mobile + Laser safe + Annotazioni + PDF.js/DOCX + WebRTC + Tour
 (() => {
-  // -- PWA install --
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
   btnInstall?.addEventListener('click', ()=>{ deferredPrompt?.prompt(); deferredPrompt=null; btnInstall.hidden=true; });
@@ -9,32 +8,47 @@
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
   $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal()); $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
 
-  // -- Mobile Mode toggle + iOS vh fix --
-  const mobileToggle = document.getElementById('mobileMode');
-  function setVH(){
-    // 1% of viewport height
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-  }
+  // ===== Modalità Mobile: gestione toggle + auto su iOS/Android =====
+  const mmToggle = document.getElementById('mobileMode');
+  function setVHVar(){ const vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); }
   function applyMobileMode(on){
     document.body.classList.toggle('mobile-mode', !!on);
-    if(mobileToggle) mobileToggle.checked = !!on;
-    localStorage.setItem('mobileMode', on ? '1' : '0');
-    // Enable page-level scroll on mobile; remove inner scroll traps
-    document.body.style.overflowY = on ? 'auto' : '';
+    if (mmToggle) mmToggle.checked = !!on;
+    try{ localStorage.setItem('mobile-mode', on ? '1':'0'); }catch{}
+    setVHVar();
   }
-  // init
-  setVH();
-  window.addEventListener('resize', setVH, {passive:true});
-  window.addEventListener('orientationchange', ()=>{ setTimeout(setVH, 100); }, {passive:true});
-  mobileToggle?.addEventListener('change', e=> applyMobileMode(e.target.checked));
-  // Auto-enable on small screens (keep manual control)
-  const saved = localStorage.getItem('mobileMode');
-  if(saved===null){
-    const auto = window.matchMedia('(max-width: 820px)').matches;
-    applyMobileMode(auto);
-  } else {
-    applyMobileMode(saved==='1');
+  function shouldAutoMobile(){
+    const narrow = window.matchMedia('(max-width: 820px)').matches;
+    const ua = navigator.userAgent || '';
+    const isIOS = /iP(hone|od|ad)/i.test(ua);
+    const isAndroid = /Android/i.test(ua);
+    return narrow || isIOS || isAndroid;
+  }
+  (function initMobileMode(){
+    setVHVar();
+    window.addEventListener('resize', setVHVar, {passive:true});
+    window.addEventListener('orientationchange', setVHVar, {passive:true});
+    let stored = null; try{ stored = localStorage.getItem('mobile-mode'); }catch{}
+    if (stored === '1' || (stored === null && shouldAutoMobile())){ applyMobileMode(true); }
+    mmToggle?.addEventListener('change', (e)=> applyMobileMode(e.target.checked));
+  })();
+
+  // Tour safe default
+  const tourRoot = document.getElementById('tour');
+  if (tourRoot) tourRoot.classList.add('hidden');
+  const notour = new URL(location.href).searchParams.get('notour')==='1';
+  if (notour && tourRoot) tourRoot.remove();
+  function tourShow(){ tourRoot?.classList.remove('hidden'); tourRoot?.classList.add('show'); }
+  function tourHide(){
+    if (tourRoot) {
+      const maskEl = tourRoot.querySelector('.tour-mask');
+      if (maskEl){
+        maskEl.style.setProperty('--spot-x','-1000px');
+        maskEl.style.setProperty('--spot-y','-1000px');
+        maskEl.style.setProperty('--spot-r','0px');
+      }
+    }
+    tourRoot?.classList.remove('show'); tourRoot?.classList.add('hidden');
   }
 
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
@@ -50,14 +64,22 @@
   const live=$('.live-indicator');
 
   async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
-  async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect?.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
+  async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
   function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
   async function stopAll(){ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); videoGrid.innerHTML=''; }
   btnAddCam?.addEventListener('click', addCam); btnStopAll?.addEventListener('click', stopAll); navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
 
   // Recorder
   let mediaRecorder, chunks=[];
-  $('#btnRec')?.addEventListener('click', ()=>{ if(!mediaRecorder || mediaRecorder.state==='inactive'){ const mix=new MediaStream(); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t))); mediaRecorder=new MediaRecorder(mix,{mimeType:'video/webm;codecs=vp9'}); mediaRecorder.ondataavailable=e=>chunks.push(e.data); mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); chunks=[]; const url=URL.createObjectURL(blob); const a=$('#downloadRec'); a.href=url; a.download='session.webm'; a.classList.remove('hidden'); a.textContent='Scarica registrazione'; }; mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec'; } else { mediaRecorder.stop(); $('#btnRec').textContent='Avvia Rec'; } });
+  $('#btnRec')?.addEventListener('click', ()=>{
+    if(!mediaRecorder || mediaRecorder.state==='inactive'){
+      const mix=new MediaStream(); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t)));
+      mediaRecorder=new MediaRecorder(mix,{mimeType:'video/webm;codecs=vp9'});
+      mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+      mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); chunks=[]; const url=URL.createObjectURL(blob); const a=$('#downloadRec'); a.href=url; a.download='session.webm'; a.classList.remove('hidden'); a.textContent='Scarica registrazione'; };
+      mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec';
+    } else { mediaRecorder.stop(); $('#btnRec').textContent='Avvia Rec'; }
+  });
 
   // Chat helpers
   const chatLog=$('#chatLog'), chatInput=$('#chatInput');
@@ -110,7 +132,7 @@
     clearBtn && (clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}); });
     shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){} });
 
-    // Hook ricezione via data channel
+    // Hook per ricezione via data channel
     const oldHook = window.__setupDC__;
     window.__setupDC__ = function(ch){
       if (oldHook) oldHook(ch);
@@ -127,7 +149,7 @@
             }
             if(m.evt==='up') last=null;
           }
-          if(m.t==='annoImage'){ /* opzionale */ }
+          if(m.t==='annoImage'){ /* opzionale: window.open(m.data,'_blank'); */ }
           if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
           if(m.t==='cursor'){ const rc=document.getElementById('remoteCursor'); if(rc){ rc.classList.remove('hidden'); const rect=document.querySelector('.docWrap').getBoundingClientRect(); rc.style.left=(m.nx*rect.width)+'px'; rc.style.top=(m.ny*rect.height)+'px'; } }
         }catch{}
@@ -136,18 +158,17 @@
   }
   initAnnotations();
 
-  // ------- Laser + documenti (+ PDF.js / DOCX + Sync) -------
+  // ------- Laser + documenti (+ PDF.js fix + Sync) -------
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
-  $('#btnLaser')?.addEventListener('click', ()=>{ 
-    laser=!laser; 
-    $('#btnLaser').textContent=laser?'Laser OFF':'Laser ON'; 
-    if(overlay){ overlay.style.pointerEvents = laser?'auto':'none'; }
-    lCursor?.classList.toggle('hidden', !laser); 
+  $('#btnLaser')?.addEventListener('click', ()=>{
+    laser=!laser; $('#btnLaser').textContent=laser?'Laser OFF':'Laser ON';
+    if(overlay) overlay.style.pointerEvents = laser?'auto':'none';
+    lCursor?.classList.toggle('hidden', !laser);
   });
   function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
-  overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); sendData({t:'cursor', nx, ny}); });
+  overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'cursor', nx, ny})); }catch{} });
 
   // PDF.js / DOCX viewer
   $('#btnPdfJs')?.addEventListener('click', ()=>{
@@ -155,28 +176,28 @@
     if(!url){ appendChat('Nessun documento aperto','sys'); return; }
     const low = url.toLowerCase();
     if(low.endsWith('.docx')){
-      if(url.startsWith('blob:')){ appendChat('DOCX locale (blob): metti il file in /docs o usa URL pubblico per aprirlo.','sys'); return; }
+      if(url.startsWith('blob:')){ appendChat('DOCX locale (blob): usa file in /docs o URL pubblico per aprirlo nel viewer.','sys'); return; }
       const office = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url);
       if(docFrame) docFrame.src = office;
       appendChat('Aperto DOCX con Office Web Viewer','sys');
       return;
     }
-    if(url.startsWith('blob:')){ appendChat('PDF.js non apre blob locali. Metti il PDF in /docs o usa URL pubblico.','sys'); return; }
+    if(url.startsWith('blob:')){ appendChat('PDF.js non può aprire file locali (blob). Metti il PDF in /docs o usa URL pubblico.','sys'); return; }
     const viewer = 'https://mozilla.github.io/pdf.js/web/viewer.html?file=' + encodeURIComponent(url);
     if(docFrame) docFrame.src = viewer;
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
   });
 
   // file picker
-  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; sendData({t:'docOpen', url}); if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato (blob). Per aprirlo nel viewer usa URL pubblico o /docs.','sys'); } });
+  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'docOpen', url})); }catch{} if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato in locale (blob). Per aprirlo nel viewer usa un URL web o posizionalo in /docs.', 'sys'); } });
 
   // Sync vista → remoto
   $('#btnSync')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
     if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.', 'sys'); return; }
     if(!url){ appendChat('Nessun documento da sincronizzare.', 'sys'); return; }
-    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web (non blob).', 'sys'); return; }
-    sendData({t:'docOpen', url});
+    if(url.startsWith('blob:')){ appendChat('Sync richiede URL web. Metti il file in /docs o usa un link pubblico.', 'sys'); return; }
+    try{ dc.send(JSON.stringify({t:'docOpen', url})); }catch{}
     appendChat('Sync inviato ✓','sys');
   });
 
@@ -193,16 +214,15 @@
   document.getElementById('btnApplyAnswer')?.addEventListener('click', applyAnswer);
 
   function logGH(s){ ghLog.value+=(s+'\n'); ghLog.scrollTop=ghLog.scrollHeight; }
-  async function ghFetch(path, opts={}){ const tok=ghToken?.value?.trim()||''; if(!tok) throw new Error('Token mancante'); const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts}); const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; } }
-  function repoParts(){ const [owner,repo]=(ghRepo?.value||'').split('/'); return {owner,repo}; }
+  async function ghFetch(path, opts={}){ const tok=ghToken?.value?.trim?.()||''; if(!tok) throw new Error('Token mancante'); const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts}); const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; } }
+  function repoParts(){ const v=ghRepo?.value||''; const [owner,repo]=v.split('/'); return {owner,repo}; }
   document.getElementById('btnGhStart')?.addEventListener('click', ()=> logGH('Issue collegata (client-side).'));
-  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('\"type\":\"offer\"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=(ghIssue?.value||'').trim(); const res=await ghFetch(f`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
-  document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{ try{ const {owner,repo}=repoParts(); const issue=(ghIssue?.value||'').trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } });
+  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
+  document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{ try{ const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } });
 
-  // ---------- Tutorial interattivo ----------
+  // ---------- Tutorial ----------
   const tourEl = document.getElementById('tour');
-  const notour = new URL(location.href).searchParams.get('notour')==='1';
-  if (tourEl && !notour){
+  if (tourEl){
     const highlight = document.createElement('div'); highlight.className = 'tour-highlight'; tourEl.appendChild(highlight);
     const stepEl = tourEl.querySelector('.tour-step');
     const steps = [
@@ -216,60 +236,110 @@
     ];
     let idx=0;
 
-    function tourShow(){ tourEl?.classList.remove('hidden'); tourEl?.classList.add('show'); }
-    function tourHide(){ tourEl?.classList.remove('show'); tourEl?.classList.add('hidden'); }
-
     function placeHighlight(target){
       const pop = tourEl.querySelector('.tour-pop');
       const hi  = highlight;
+      const maskEl = tourEl.querySelector('.tour-mask');
+
       if (!target) {
         hi.style.width = hi.style.height = '0px';
         hi.style.left = hi.style.top = '-9999px';
+        if (maskEl){
+          maskEl.style.setProperty('--spot-x','-1000px');
+          maskEl.style.setProperty('--spot-y','-1000px');
+          maskEl.style.setProperty('--spot-r','0px');
+        }
         pop.style.left = (window.innerWidth - (pop.offsetWidth||360))/2 + 'px';
         pop.style.top  = (window.innerHeight - (pop.offsetHeight||140))/2 + 'px';
         pop.dataset.arrow = 'none';
         return;
       }
+
       const rect0 = target.getBoundingClientRect();
       const margin = 24;
-      if (rect0.top < margin || rect0.bottom > (window.innerHeight-margin) || rect0.left < margin || rect0.right > (window.innerWidth - margin)) {
+      const outTop = rect0.top < margin;
+      const outBottom = rect0.bottom > (window.innerHeight - margin);
+      const outLeft = rect0.left < margin;
+      const outRight = rect0.right > (window.innerWidth - margin);
+      if (outTop || outBottom || outLeft || outRight) {
         target.scrollIntoView({behavior:'smooth', block:'center', inline:'center'});
       }
+
       const r = target.getBoundingClientRect();
+
       const pad = 8;
       const x = Math.max(0, r.left - pad);
       const y = Math.max(0, r.top  - pad);
       const w = Math.min(window.innerWidth  - x, r.width  + pad*2);
       const h = Math.min(window.innerHeight - y, r.height + pad*2);
-      hi.style.position='fixed'; hi.style.left = x + 'px'; hi.style.top  = y + 'px'; hi.style.width  = w + 'px'; hi.style.height = h + 'px';
+      hi.style.position='fixed';
+      hi.style.left = x + 'px';
+      hi.style.top  = y + 'px';
+      hi.style.width  = w + 'px';
+      hi.style.height = h + 'px';
 
-      const gap = 16; const pw = pop.offsetWidth  || 420; const ph = pop.offsetHeight || 160;
+      if (maskEl){
+        const cx = r.left + r.width/2;
+        const cy = r.top  + r.height/2;
+        const rad = Math.hypot(r.width, r.height)/2 + 18;
+        maskEl.style.setProperty('--spot-x', cx + 'px');
+        maskEl.style.setProperty('--spot-y', cy + 'px');
+        maskEl.style.setProperty('--spot-r', rad + 'px');
+      }
+
+      const gap = 16;
+      const pw = pop.offsetWidth  || 420;
+      const ph = pop.offsetHeight || 160;
       const roomRight = window.innerWidth  - (r.right + gap);
       const roomLeft  = r.left - gap;
       const roomAbove = r.top - gap;
       const roomBelow = window.innerHeight - (r.bottom + gap);
+
       let px, py, arrow = 'left';
-      if (roomRight >= pw) { px = r.right + gap; py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin); arrow = 'left'; }
-      else if (roomLeft >= pw) { px = r.left - pw - gap; py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin); arrow = 'right'; }
-      else if (roomBelow >= ph) { px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin); py = r.bottom + gap; arrow = 'top'; }
-      else if (roomAbove >= ph) { px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin); py = r.top - ph - gap; arrow = 'bottom'; }
-      else { px = (window.innerWidth - pw)/2; py = (window.innerHeight - ph)/2; arrow = 'none'; }
+      if (roomRight >= pw) {
+        px = r.right + gap;
+        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
+        arrow = 'left';
+      } else if (roomLeft >= pw) {
+        px = r.left - pw - gap;
+        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
+        arrow = 'right';
+      } else if (roomBelow >= ph) {
+        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
+        py = r.bottom + gap;
+        arrow = 'top';
+      } else if (roomAbove >= ph) {
+        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
+        py = r.top - ph - gap;
+        arrow = 'bottom';
+      } else {
+        px = (window.innerWidth - pw)/2;
+        py = (window.innerHeight - ph)/2;
+        arrow = 'none';
+      }
+
       px = Math.min(Math.max(px, margin), window.innerWidth  - pw - margin);
       py = Math.min(Math.max(py, margin), window.innerHeight - ph - margin);
-      pop.style.left = px + 'px'; pop.style.top  = py + 'px'; pop.dataset.arrow = arrow;
+
+      pop.style.left = px + 'px';
+      pop.style.top  = py + 'px';
+      pop.dataset.arrow = arrow;
     }
 
     function showStep(i){
-      idx=i; const s=steps[idx]; const target=document.querySelector(s.sel);
+      idx=i;
+      const s=steps[idx];
+      const target=document.querySelector(s.sel);
       stepEl.textContent = `Passo ${idx+1}/${steps.length} — `+s.text;
-      placeHighlight(target); tourShow();
+      placeHighlight(target);
+      tourShow();
     }
     function next(){ if(idx<steps.length-1) showStep(idx+1); else tourHide(); }
     function prev(){ if(idx>0) showStep(idx-1); }
     document.getElementById('tourNext')?.addEventListener('click', next);
     document.getElementById('tourPrev')?.addEventListener('click', prev);
     document.getElementById('tourClose')?.addEventListener('click', tourHide);
-    document.getElementById('tourExit')?.addEventListener('click', tourHide);
+
     document.getElementById('btnTutorial')?.addEventListener('click', ()=> showStep(0));
     document.getElementById('startTour')?.addEventListener('click', ()=>{ document.getElementById('help')?.close(); showStep(0); });
 
@@ -278,11 +348,10 @@
     });
   }
 
-  // -- SW refresh on controllerchange --
+  // ricarica pagina quando viene attivato un nuovo SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
     });
   }
-
 })();
