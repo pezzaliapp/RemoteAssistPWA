@@ -1,7 +1,7 @@
 {
   "name": "pezzaliAPP Remote Assist SUITE",
-  "short_name": "Remote Assist",
-  "start_url": ".",
+  "short_name": "RemoteAssist",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0b1022",
   "theme_color": "#0b1022",
