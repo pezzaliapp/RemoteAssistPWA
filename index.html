@@ -20,8 +20,14 @@
       </div>
       <div class="live-indicator idle" title="Inattivo"></div>
     </div>
+
+    <!-- Mini toggle Modalità Mobile -->
+    <label class="mobile-toggle">
+      <input id="mobileMode" type="checkbox">
+      Modalità Mobile
+    </label>
+
     <nav>
-      <label class="mobile-toggle"><input type="checkbox" id="mobileMode"> Modalità Mobile</label>
       <button id="btnInstall" hidden>Installa</button>
       <a id="btnDoc" href="docs/guida.html" target="_blank">📘 Guida</a>
       <button id="btnTutorial">🧭 Avvia guida</button>
@@ -94,7 +100,7 @@
           <input type="file" id="filePicker" accept=".pdf,.png,.jpg,.jpeg,.svg,.doc,.docx">
           <button id="btnSync">Sync vista → remoto</button>
           <button id="btnLaser">Laser ON</button>
-          <button id="btnPdfJs">Apri con PDF.js</button>
+          <button id="btnPdfJs">Apri con PDF.js / DOCX</button>
         </div>
         <div class="docWrap">
           <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici"></iframe>
@@ -138,12 +144,7 @@
     <div class="tour-mask"></div>
     <div class="tour-pop">
       <div class="tour-step"></div>
-      <div class="tour-actions">
-        <button id="tourPrev">Indietro</button>
-        <button id="tourNext">Avanti</button>
-        <button id="tourClose">Chiudi</button>
-        <button id="tourExit">Torna all’app</button>
-      </div>
+      <div class="tour-actions"><button id="tourPrev">Indietro</button><button id="tourNext">Avanti</button><button id="tourClose">Chiudi</button></div>
     </div>
   </div>
 
@@ -162,7 +163,6 @@
     <button id="startTour">🧭 Avvia guida qui</button>
     <button id="closeHelp">Chiudi</button>
   </dialog>
-
   <script src="app.js"></script>
   <script> if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); } </script>
 </body></html>
