@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Scroll Test — Remote Assist</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+body{
+  margin:0;
+  background:radial-gradient(1200px 600px at 50% -20%,#172042,#0b1022);
+  font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  color:#eaf1ff;
+}
+section{
+  background:#101739;
+  border:1px solid #223082;
+  border-radius:12px;
+  margin:20px auto;
+  padding:16px;
+  max-width:800px;
+}
+footer{
+  text-align:center;
+  padding:20px;
+  color:#a3b7ea;
+  border-top:1px solid #202a5a;
+  background:#0e1533cc;
+  margin-top:40px;
+}
+button{
+  display:block;
+  width:100%;
+  max-width:200px;
+  margin:20px auto;
+  background:#1a275f;
+  color:white;
+  border:1px solid #2b3a86;
+  border-radius:8px;
+  padding:10px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h2 style="margin:12px;">🧩 Scroll Test — Remote Assist SUITE</h2>
+</header>
+
+<main>
+  <section>
+    <p>Scorri in basso per verificare che lo scroll funzioni normalmente su iPhone e Laptop.</p>
+    <p>Questo test simula una sezione lunga con vari contenuti e blocchi di testo.</p>
+  </section>
+
+  <section style="height:600px;">Blocco di contenuto A (600px)</section>
+  <section style="height:600px;">Blocco di contenuto B (600px)</section>
+  <section style="height:600px;">Blocco di contenuto C (600px)</section>
+
+  <button onclick="window.scrollTo({top:0,behavior:'smooth'})">Torna su</button>
+</main>
+
+<footer>
+  © 2025 pezzaliAPP — All Rights Reserved  
+  <br><small>Se riesci a leggere questa scritta, lo scroll funziona correttamente ✅</small>
+</footer>
+
+</body>
+</html>
