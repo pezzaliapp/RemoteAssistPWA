@@ -1,4 +1,4 @@
-// app.js — Modalità Mobile + Laser safe + Annotazioni + PDF.js/DOCX + WebRTC + Tour + WebBluetooth
+// app.js — Modalità Mobile + Laser (doc & video) + Annotazioni + PDF.js/DOCX + WebRTC + Tour + WebBluetooth
 (() => {
   // --- PWA install banner ---
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
@@ -78,6 +78,8 @@
   const sdpBox=$('#sdpBox'); const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
   const live=$('.live-indicator');
 
+  let tileSeq = 0; // id progressivo per riquadri video
+
   async function listCams(){
     const devs=await navigator.mediaDevices.enumerateDevices();
     const cams=devs.filter(d=>d.kind==='videoinput');
@@ -94,13 +96,55 @@
   function addTile(stream,label='locale'){
     const wrap=document.createElement('div');
     wrap.className='tile';
+    wrap.dataset.tid = (++tileSeq).toString();
+
     const v=document.createElement('video');
     v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream;
+
+    // overlay laser per tile video
+    const overlay = document.createElement('div');
+    overlay.className = 'laserOverlay';
+    overlay.style.pointerEvents = 'none';   // attivato solo quando laser ON
+    overlay.style.touchAction = 'none';
+
+    const dotLocal  = document.createElement('div'); dotLocal.className  = 'cursorDot local';  dotLocal.style.display='none';
+    const dotRemote = document.createElement('div'); dotRemote.className = 'cursorDot remote'; dotRemote.style.display='none';
+    overlay.appendChild(dotLocal); overlay.appendChild(dotRemote);
+
+    // etichetta
     const lb=document.createElement('div');
     lb.className='label'; lb.textContent=label;
-    wrap.appendChild(v); wrap.appendChild(lb);
+
+    wrap.appendChild(v); 
+    wrap.appendChild(overlay);
+    wrap.appendChild(lb);
     videoGrid.appendChild(wrap);
+
+    // mover locale (quando laser attivo)
+    function moveInTile(e){
+      if(!laser) return;
+      const r = overlay.getBoundingClientRect();
+      const cx = (e.clientX ?? (e.touches?.[0]?.clientX)) ?? 0;
+      const cy = (e.clientY ?? (e.touches?.[0]?.clientY)) ?? 0;
+      const nx = (cx - r.left) / r.width;
+      const ny = (cy - r.top)  / r.height;
+      placeTileDot(dotLocal, overlay, nx, ny);
+      try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'vidCursor', id:wrap.dataset.tid, nx, ny})); }catch{}
+    }
+    overlay.addEventListener('pointermove', moveInTile, {passive:true});
+    overlay.addEventListener('pointerdown', moveInTile, {passive:true});
+    overlay.addEventListener('touchmove', moveInTile, {passive:true});
+    overlay.addEventListener('pointerleave', ()=>{ dotLocal.style.display='none'; }, {passive:true});
+
+    return wrap;
   }
+  function placeTileDot(dotEl, overlayEl, nx, ny){
+    dotEl.style.display='block';
+    const ow = overlayEl.clientWidth, oh = overlayEl.clientHeight;
+    dotEl.style.left = (nx*ow) + 'px';
+    dotEl.style.top  = (ny*oh) + 'px';
+  }
+
   async function stopAll(){
     $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop()));
     videoGrid.innerHTML='';
@@ -315,7 +359,29 @@
           }
           if(m.t==='annoImage'){ /* opzionale */ }
           if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
-          if(m.t==='cursor'){ const rc=document.getElementById('remoteCursor'); if(rc){ rc.classList.remove('hidden'); const rect=document.querySelector('.docWrap').getBoundingClientRect(); rc.style.left=(m.nx*rect.width)+'px'; rc.style.top=(m.ny*rect.height)+'px'; } }
+          if(m.t==='cursor'){ // laser su documenti
+            const rc=document.getElementById('remoteCursor');
+            if(rc){ 
+              rc.classList.remove('hidden'); 
+              const rect=document.querySelector('.docWrap').getBoundingClientRect(); 
+              rc.style.left=(m.nx*rect.width)+'px'; 
+              rc.style.top=(m.ny*rect.height)+'px'; 
+            }
+          }
+          if(m.t==='vidCursor'){ // laser su riquadri video
+            const tile = document.querySelector(`.tile[data-tid="${m.id}"]`);
+            if(tile){
+              tile.classList.add('laser-active');
+              const overlay = tile.querySelector('.laserOverlay');
+              const dotR = tile.querySelector('.cursorDot.remote');
+              if (overlay && dotR){
+                const ow = overlay.clientWidth, oh = overlay.clientHeight;
+                dotR.style.left = (m.nx*ow) + 'px';
+                dotR.style.top  = (m.ny*oh) + 'px';
+                dotR.style.display='block';
+              }
+            }
+          }
         }catch{}
       });
     };
@@ -326,13 +392,39 @@
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
-  $('#btnLaser')?.addEventListener('click', ()=>{
-    laser=!laser; $('#btnLaser').textContent=laser?'Laser OFF':'Laser ON';
+
+  function setLaser(on){
+    laser = !!on;
+    $('#btnLaser') && ($('#btnLaser').textContent = laser ? 'Laser OFF' : 'Laser ON');
     if(overlay) overlay.style.pointerEvents = laser?'auto':'none';
     lCursor?.classList.toggle('hidden', !laser);
+    // attiva overlay sui riquadri video
+    $$('#videoGrid .tile').forEach(t=>{
+      const ov = t.querySelector('.laserOverlay');
+      if(ov) ov.style.pointerEvents = laser ? 'auto' : 'none';
+      t.classList.toggle('laser-active', laser);
+      if(!laser){
+        const dl = t.querySelector('.cursorDot.local');  if(dl) dl.style.display='none';
+        const dr = t.querySelector('.cursorDot.remote'); if(dr) dr.style.display='none';
+      }
+    });
+  }
+
+  $('#btnLaser')?.addEventListener('click', ()=> setLaser(!laser));
+
+  function posCursor(el, nx, ny){
+    const rect=$('.docWrap').getBoundingClientRect();
+    el.style.left=(nx*rect.width)+'px';
+    el.style.top=(ny*rect.height)+'px';
+  }
+  overlay?.addEventListener('pointermove', e=>{
+    if(!laser) return;
+    const rect=$('.docWrap').getBoundingClientRect();
+    const nx=(e.clientX-rect.left)/rect.width;
+    const ny=(e.clientY-rect.top)/rect.height;
+    posCursor(lCursor, nx, ny);
+    try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'cursor', nx, ny})); }catch{}
   });
-  function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
-  overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'cursor', nx, ny})); }catch{} });
 
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
@@ -501,27 +593,11 @@
       const roomBelow = window.innerHeight - (r.bottom + gap);
 
       let px, py, arrow = 'left';
-      if (roomRight >= pw) {
-        px = r.right + gap;
-        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
-        arrow = 'left';
-      } else if (roomLeft >= pw) {
-        px = r.left - pw - gap;
-        py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin);
-        arrow = 'right';
-      } else if (roomBelow >= ph) {
-        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
-        py = r.bottom + gap;
-        arrow = 'top';
-      } else if (roomAbove >= ph) {
-        px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin);
-        py = r.top - ph - gap;
-        arrow = 'bottom';
-      } else {
-        px = (window.innerWidth - pw)/2;
-        py = (window.innerHeight - ph)/2;
-        arrow = 'none';
-      }
+      if (roomRight >= pw) { px = r.right + gap;  py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin); arrow = 'left'; }
+      else if (roomLeft >= pw) { px = r.left - pw - gap; py = Math.min(Math.max(r.top, margin), window.innerHeight - ph - margin); arrow = 'right'; }
+      else if (roomBelow >= ph) { px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin); py = r.bottom + gap; arrow = 'top'; }
+      else if (roomAbove >= ph) { px = Math.min(Math.max(r.left, margin), window.innerWidth - pw - margin); py = r.top - ph - gap; arrow = 'bottom'; }
+      else { px = (window.innerWidth - pw)/2; py = (window.innerHeight - ph)/2; arrow = 'none'; }
 
       px = Math.min(Math.max(px, margin), window.innerWidth  - pw - margin);
       py = Math.min(Math.max(py, margin), window.innerHeight - ph - margin);
