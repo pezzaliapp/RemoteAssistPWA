@@ -26,7 +26,7 @@ header{
 .live-indicator.idle{background:#556b8d;animation:none}
 nav button, nav a{background:#162155;color:var(--ink);border:1px solid #2b3a86;border-radius:8px;padding:6px 10px;text-decoration:none}
 
-/* Toggle mobile in header */
+/* Toggle mobile */
 .mobile-toggle{display:inline-flex;align-items:center;gap:6px;margin-right:8px;color:#9acbff;font-size:13px}
 #mobileMode{accent-color:var(--cta)}
 
@@ -140,7 +140,11 @@ body.mobile-mode .tabs{
 }
 
 /* Responsive fallback (se non si usa il toggle) */
-@media (max-width:980px){ .sidebar{width:100%} main{flex-direction:column} }
+@media (max-width:980px){
+  .sidebar{width:100%}
+  main{flex-direction:column; height:auto !important;}   /* <-- sblocca lo scroll */
+  .sidebar, .content{ overflow:visible !important; }     /* <-- niente scroll interni */
+}
 
 /* ===== Tutorial overlay ===== */
 .tour{position:fixed;inset:0;z-index:9999}
