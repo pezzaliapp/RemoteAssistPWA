@@ -1,19 +1,13 @@
 <!DOCTYPE html>
-<html lang="it">
-<head>
+<html lang="it"><head>
   <meta charset="utf-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1022">
   <title>pezzaliAPP Remote Assist SUITE v1.0</title>
-
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
-
-  <!-- PWA iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -27,6 +21,7 @@
       <div class="live-indicator idle" title="Inattivo"></div>
     </div>
 
+    <!-- Mini toggle Modalità Mobile -->
     <label class="mobile-toggle">
       <input id="mobileMode" type="checkbox">
       Modalità Mobile
@@ -52,21 +47,12 @@
       <div class="card controls">
         <h3>Sessione</h3>
         <label>Ruolo:
-          <select id="role">
-            <option value="tech">Tecnico sul campo</option>
-            <option value="expert">Esperto remoto</option>
-          </select>
+          <select id="role"><option value="tech">Tecnico sul campo</option><option value="expert">Esperto remoto</option></select>
         </label>
         <label>Segnaling:
-          <select id="sigMode">
-            <option value="manual">Manuale (copia/incolla)</option>
-            <option value="github">GitHub Issues (beta)</option>
-          </select>
+          <select id="sigMode"><option value="manual">Manuale (copia/incolla)</option><option value="github">GitHub Issues (beta)</option></select>
         </label>
-        <div class="row">
-          <button id="btnJoin">Entra</button>
-          <button id="btnLeave">Esci</button>
-        </div>
+        <div class="row"><button id="btnJoin">Entra</button><button id="btnLeave">Esci</button></div>
       </div>
 
       <div class="card devices std-only">
@@ -82,25 +68,14 @@
 
       <div class="card glasses-only hidden">
         <h3>Smart Glasses Mode</h3>
-        <div class="row">
-          <button id="btnBtBattery">Connetti (Web Bluetooth)</button>
-          <span id="btStatus" class="muted">Non connesso</span>
-        </div>
-        <div class="row">
-          <label>Uscita audio:<select id="audioOut"></select></label>
-          <button id="applySink">Applica</button>
-        </div>
+        <div class="row"><button id="btnBtBattery">Connetti (Web Bluetooth)</button><span id="btStatus" class="muted">Non connesso</span></div>
+        <div class="row"><label>Uscita audio:<select id="audioOut"></select></label><button id="applySink">Applica</button></div>
         <small id="sinkInfo" class="muted"></small>
       </div>
 
       <div class="card mobile-only hidden">
         <h3>Mobile Cam</h3>
-        <div class="row">
-          <button id="btnRearCam">Avvia posteriore</button>
-          <button id="btnTorch">Torch ON</button>
-          <button id="btnFullscreen">Fullscreen</button>
-          <button id="btnLock">Blocca orientamento</button>
-        </div>
+        <div class="row"><button id="btnRearCam">Avvia posteriore</button><button id="btnTorch">Torch ON</button><button id="btnFullscreen">Fullscreen</button><button id="btnLock">Blocca orientamento</button></div>
         <small>Fissa il telefono per POV stabile.</small>
       </div>
 
@@ -108,10 +83,7 @@
 
       <div class="card record">
         <h3>Registrazione</h3>
-        <div class="row">
-          <button id="btnRec">Avvia Rec</button>
-          <a id="downloadRec" class="hidden">Scarica</a>
-        </div>
+        <div class="row"><button id="btnRec">Avvia Rec</button><a id="downloadRec" class="hidden">Scarica</a></div>
       </div>
     </aside>
 
@@ -140,49 +112,27 @@
 
       <div class="panel hidden" id="panel-annotate">
         <div class="row">
-          <button id="pen">Penna</button>
-          <button id="eraser">Gomma</button>
-          <button id="clear">Pulisci</button>
+          <button id="pen">Penna</button><button id="eraser">Gomma</button><button id="clear">Pulisci</button>
           <label>Spessore <input id="thick" type="range" min="1" max="16" value="3"></label>
         </div>
-        <div class="anno-wrap">
-          <img id="annoBg" src="docs/bg.jpg" alt="">
-          <canvas id="annoCanvas"></canvas>
-        </div>
+        <div class="anno-wrap"><img id="annoBg" src="docs/bg.jpg" alt=""><canvas id="annoCanvas"></canvas></div>
         <div class="row"><button id="btnAnnoShare">Condividi schema su remoto</button></div>
       </div>
 
       <div class="panel hidden" id="panel-chat">
         <div id="chatLog"></div>
-        <div class="row">
-          <input id="chatInput" placeholder="Scrivi un messaggio…">
-          <button id="chatSend">Invia</button>
-        </div>
+        <div class="row"><input id="chatInput" placeholder="Scrivi un messaggio…"><button id="chatSend">Invia</button></div>
       </div>
 
       <div class="panel hidden" id="panel-signal">
         <h3>Signaling manuale (copia/incolla)</h3>
-        <div class="row">
-          <button id="btnMakeOffer">Genera Offerta</button>
-          <button id="btnMakeAnswer">Crea Risposta da Offerta</button>
-          <button id="btnApplyAnswer">Applica Risposta</button>
-        </div>
-        <label>Offerta / Risposta (SDP JSON):
-          <textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea>
-        </label>
+        <div class="row"><button id="btnMakeOffer">Genera Offerta</button><button id="btnMakeAnswer">Crea Risposta da Offerta</button><button id="btnApplyAnswer">Applica Risposta</button></div>
+        <label>Offerta / Risposta (SDP JSON):<textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea></label>
         <div class="muted">
           <p><b>GitHub Issues (beta)</b>: usa un issue come stanza e scambia OFFER/ANSWER nei commenti.</p>
           <div id="ghBox2">
-            <div class="row">
-              <input id="ghRepo" placeholder="owner/repo">
-              <input id="ghIssue" placeholder="# Issue">
-              <input id="ghToken" type="password" placeholder="ghp_...">
-            </div>
-            <div class="row">
-              <button id="btnGhStart">Collega Issue</button>
-              <button id="btnGhSend">Invia su Issue</button>
-              <button id="btnGhPoll">Aggiorna da Issue</button>
-            </div>
+            <div class="row"><input id="ghRepo" placeholder="owner/repo"><input id="ghIssue" placeholder="# Issue"><input id="ghToken" type="password" placeholder="ghp_..."></div>
+            <div class="row"><button id="btnGhStart">Collega Issue</button><button id="btnGhSend">Invia su Issue</button><button id="btnGhPoll">Aggiorna da Issue</button></div>
             <textarea id="ghLog" rows="6" placeholder="Log GitHub..."></textarea>
           </div>
         </div>
@@ -194,11 +144,7 @@
     <div class="tour-mask"></div>
     <div class="tour-pop">
       <div class="tour-step"></div>
-      <div class="tour-actions">
-        <button id="tourPrev">Indietro</button>
-        <button id="tourNext">Avanti</button>
-        <button id="tourClose">Chiudi</button>
-      </div>
+      <div class="tour-actions"><button id="tourPrev">Indietro</button><button id="tourNext">Avanti</button><button id="tourClose">Chiudi</button></div>
     </div>
   </div>
 
@@ -212,15 +158,12 @@
     <ol>
       <li>Scegli la modalità: <b>Standard</b>, <b>Smart Glasses</b> o <b>Mobile Cam</b>.</li>
       <li>Usa la tab <b>Segnaling</b> per collegarti (Manuale o GitHub Issues).</li>
-      <li>Con <b>Laser</b> e <b>Annotazioni</b> guidi l’intervento.</li>
+      <li>Con <b>Laser</b> e <b>Annotazioni</b> guidi l’intervento “chirurgico”.</li>
     </ol>
     <button id="startTour">🧭 Avvia guida qui</button>
     <button id="closeHelp">Chiudi</button>
   </dialog>
 
   <script src="app.js"></script>
-  <script>
-    if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
-  </script>
-</body>
-</html>
+  <script> if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); } </script>
+</body></html>
