@@ -23,6 +23,7 @@
   function setVHVar(){ const vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); }
   function applyMobileMode(on){
     document.body.classList.toggle('mobile-mode', !!on);
+    document.documentElement.classList.toggle('mobile-mode', !!on); // <— IMPORTANTE per iOS
     if (mmToggle) mmToggle.checked = !!on;
     try{ localStorage.setItem('mobile-mode', on ? '1':'0'); }catch{}
     setVHVar();
@@ -78,7 +79,7 @@
   const sdpBox=$('#sdpBox'); const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
   const live=$('.live-indicator');
 
-  let tileSeq = 0; // id progressivo per riquadri video
+  let tileSeq = 0;
 
   async function listCams(){
     const devs=await navigator.mediaDevices.enumerateDevices();
@@ -101,26 +102,23 @@
     const v=document.createElement('video');
     v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream;
 
-    // overlay laser per tile video
     const overlay = document.createElement('div');
     overlay.className = 'laserOverlay';
-    overlay.style.pointerEvents = 'none';   // attivato solo quando laser ON
+    overlay.style.pointerEvents = 'none';
     overlay.style.touchAction = 'none';
 
     const dotLocal  = document.createElement('div'); dotLocal.className  = 'cursorDot local';  dotLocal.style.display='none';
     const dotRemote = document.createElement('div'); dotRemote.className = 'cursorDot remote'; dotRemote.style.display='none';
     overlay.appendChild(dotLocal); overlay.appendChild(dotRemote);
 
-    // etichetta
     const lb=document.createElement('div');
     lb.className='label'; lb.textContent=label;
 
-    wrap.appendChild(v); 
+    wrap.appendChild(v);
     wrap.appendChild(overlay);
     wrap.appendChild(lb);
     videoGrid.appendChild(wrap);
 
-    // mover locale (quando laser attivo)
     function moveInTile(e){
       if(!laser) return;
       const r = overlay.getBoundingClientRect();
@@ -135,8 +133,6 @@
     overlay.addEventListener('pointerdown', moveInTile, {passive:true});
     overlay.addEventListener('touchmove', moveInTile, {passive:true});
     overlay.addEventListener('pointerleave', ()=>{ dotLocal.style.display='none'; }, {passive:true});
-
-    return wrap;
   }
   function placeTileDot(dotEl, overlayEl, nx, ny){
     dotEl.style.display='block';
@@ -174,22 +170,18 @@
     }
   });
 
-  // ====== Web Bluetooth (Smart Glasses) + Uscita audio (sinkId) ======
-  const btnBt  = document.getElementById('btnBtBattery');   // "Connetti (Web Bluetooth)"
-  const btStatus = document.getElementById('btStatus');     // stato
-  const selAudioOut = document.getElementById('audioOut');  // select uscita
-  const btnApplySink = document.getElementById('applySink');// "Applica"
+  // ====== Web Bluetooth (Smart Glasses) + Uscita audio ======
+  const btnBt  = document.getElementById('btnBtBattery');
+  const btStatus = document.getElementById('btStatus');
+  const selAudioOut = document.getElementById('audioOut');
+  const btnApplySink = document.getElementById('applySink');
   const sinkInfo = document.getElementById('sinkInfo');
 
   if (btnBt && btStatus) {
     const setStatus = (txt) => { btStatus.textContent = txt; };
 
-    // Supporto Web Bluetooth (Chrome/Edge desktop e Android; NON Safari/iOS)
     const hasBT = !!navigator.bluetooth;
-    if (!hasBT) {
-      setStatus('Web Bluetooth non supportato su questo browser.');
-      btnBt.disabled = true;
-    }
+    if (!hasBT) { setStatus('Web Bluetooth non supportato su questo browser.'); btnBt.disabled = true; }
 
     let device = null, server = null, batteryLevelChar = null;
 
@@ -197,20 +189,10 @@
       if (!hasBT) return;
       try {
         setStatus('Richiesta dispositivo…');
-        device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['battery_service']
-        });
-
-        device.addEventListener('gattserverdisconnected', () => {
-          setStatus('Disconnesso');
-          batteryLevelChar = null;
-        });
-
+        device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['battery_service'] });
+        device.addEventListener('gattserverdisconnected', () => { setStatus('Disconnesso'); batteryLevelChar = null; });
         setStatus('Connessione…');
         server = await device.gatt.connect();
-
-        // Prova a leggere la batteria
         try {
           const svc = await server.getPrimaryService('battery_service');
           batteryLevelChar = await svc.getCharacteristic('battery_level');
@@ -232,43 +214,31 @@
       }
     });
 
-    // ------- Uscite audio (setSinkId) -------
     async function populateAudioOutputs() {
       if (!selAudioOut) return;
-
       const canSetSink = typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
       if (!canSetSink) {
-        selAudioOut.disabled = true;
-        btnApplySink?.setAttribute('disabled', 'disabled');
-        sinkInfo && (sinkInfo.textContent = 'Cambio uscita audio non supportato su questo browser.');
-        return;
+        selAudioOut.disabled = true; btnApplySink?.setAttribute('disabled', 'disabled');
+        sinkInfo && (sinkInfo.textContent = 'Cambio uscita audio non supportato su questo browser.'); return;
       }
-
       try {
         const devs = await navigator.mediaDevices.enumerateDevices();
         const outs = devs.filter(d => d.kind === 'audiooutput');
         selAudioOut.innerHTML = outs.length
           ? outs.map(o => `<option value="${o.deviceId}">${o.label || 'Uscita audio'}</option>`).join('')
           : `<option value="">(nessuna uscita trovata)</option>`;
-      } catch (e) {
-        console.warn('enumerateDevices:', e);
+      } catch {
         selAudioOut.innerHTML = `<option value="">(permessi mancanti)</option>`;
       }
     }
-
     btnApplySink?.addEventListener('click', async () => {
       const id = selAudioOut?.value || '';
       if (!id) return;
       const canSetSink = 'setSinkId' in HTMLMediaElement.prototype;
       if (!canSetSink) return;
-
       const mediaEls = Array.from(document.querySelectorAll('video, audio'));
-      try {
-        await Promise.all(mediaEls.map(el => el.setSinkId(id)));
-        sinkInfo && (sinkInfo.textContent = `Uscita impostata ✓ (${id})`);
-      } catch (e) {
-        sinkInfo && (sinkInfo.textContent = `Errore sink: ${e?.message || e}`);
-      }
+      try { await Promise.all(mediaEls.map(el => el.setSinkId(id))); sinkInfo && (sinkInfo.textContent = `Uscita impostata ✓ (${id})`); }
+      catch(e){ sinkInfo && (sinkInfo.textContent = `Errore sink: ${e?.message || e}`); }
     });
 
     if (navigator.mediaDevices?.enumerateDevices) {
@@ -280,14 +250,7 @@
   // ===== Chat =====
   const chatLog=$('#chatLog'), chatInput=$('#chatInput');
   $('#chatSend')?.addEventListener('click', ()=>{ sendChat(chatInput.value); chatInput.value=''; });
-  function appendChat(msg,who='me'){
-    const div=document.createElement('div');
-    div.className='m';
-    const pfx=who==='me'?'Tu: ':who==='remote'?'Remoto: ':'· ';
-    div.textContent=pfx+msg;
-    chatLog?.appendChild(div);
-    chatLog&&(chatLog.scrollTop=chatLog.scrollHeight);
-  }
+  function appendChat(msg,who='me'){ const div=document.createElement('div'); div.className='m'; const pfx=who==='me'?'Tu: ':who==='remote'?'Remoto: ':'· '; div.textContent=pfx+msg; chatLog?.appendChild(div); chatLog&&(chatLog.scrollTop=chatLog.scrollHeight); }
   function sendData(o){ try{ dc?.readyState==='open' && dc.send(JSON.stringify(o)); }catch{} }
   function sendChat(text){ if(!text) return; appendChat(text,'me'); sendData({t:'chat',text}); }
 
@@ -319,12 +282,7 @@
     window.addEventListener('orientationchange', sizeCanvasToParent);
     setTimeout(sizeCanvasToParent, 30);
 
-    function pt(e){
-      const r=canvas.getBoundingClientRect();
-      const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
-      const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
-      return {x,y};
-    }
+    function pt(e){ const r=canvas.getBoundingClientRect(); const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left; const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top; return {x,y}; }
     function seg(a,b){
       ctx.globalCompositeOperation = (mode==='pen' ? 'source-over' : 'destination-out');
       ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=+thick.value; ctx.strokeStyle='#2dd4bf';
@@ -340,7 +298,6 @@
     clearBtn && (clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}); });
     shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){} });
 
-    // Hook per ricezione via data channel
     const oldHook = window.__setupDC__;
     window.__setupDC__ = function(ch){
       if (oldHook) oldHook(ch);
@@ -361,11 +318,11 @@
           if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
           if(m.t==='cursor'){ // laser su documenti
             const rc=document.getElementById('remoteCursor');
-            if(rc){ 
-              rc.classList.remove('hidden'); 
-              const rect=document.querySelector('.docWrap').getBoundingClientRect(); 
-              rc.style.left=(m.nx*rect.width)+'px'; 
-              rc.style.top=(m.ny*rect.height)+'px'; 
+            if(rc){
+              rc.classList.remove('hidden');
+              const rect=document.querySelector('.docWrap').getBoundingClientRect();
+              rc.style.left=(m.nx*rect.width)+'px';
+              rc.style.top=(m.ny*rect.height)+'px';
             }
           }
           if(m.t==='vidCursor'){ // laser su riquadri video
@@ -388,7 +345,7 @@
   }
   initAnnotations();
 
-  // ===== Laser + Documenti (PDF.js / DOCX) =====
+  // ===== Laser + Documenti =====
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
@@ -398,7 +355,6 @@
     $('#btnLaser') && ($('#btnLaser').textContent = laser ? 'Laser OFF' : 'Laser ON');
     if(overlay) overlay.style.pointerEvents = laser?'auto':'none';
     lCursor?.classList.toggle('hidden', !laser);
-    // attiva overlay sui riquadri video
     $$('#videoGrid .tile').forEach(t=>{
       const ov = t.querySelector('.laserOverlay');
       if(ov) ov.style.pointerEvents = laser ? 'auto' : 'none';
@@ -409,7 +365,6 @@
       }
     });
   }
-
   $('#btnLaser')?.addEventListener('click', ()=> setLaser(!laser));
 
   function posCursor(el, nx, ny){
@@ -460,7 +415,7 @@
     appendChat('Sync inviato ✓','sys');
   });
 
-  // ===== WebRTC base + GitHub Issues (ridotto) =====
+  // ===== WebRTC base + GitHub Issues =====
   let pc=null, dc=null;
   function createPC(){
     pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
@@ -583,7 +538,6 @@
         maskEl.style.setProperty('--spot-y', cy + 'px');
         maskEl.style.setProperty('--spot-r', rad + 'px');
       }
-
       const gap = 16;
       const pw = pop.offsetWidth  || 420;
       const ph = pop.offsetHeight || 160;
@@ -607,14 +561,7 @@
       pop.dataset.arrow = arrow;
     }
 
-    function showStep(i){
-      idx=i;
-      const s=steps[idx];
-      const target=document.querySelector(s.sel);
-      stepEl.textContent = `Passo ${idx+1}/${steps.length} — `+s.text;
-      placeHighlight(target);
-      tourShow();
-    }
+    function showStep(i){ idx=i; const s=steps[idx]; const target=document.querySelector(s.sel); stepEl.textContent = `Passo ${idx+1}/${steps.length} — `+s.text; placeHighlight(target); tourShow(); }
     function next(){ if(idx<steps.length-1) showStep(idx+1); else tourHide(); }
     function prev(){ if(idx>0) showStep(idx-1); }
     document.getElementById('tourNext')?.addEventListener('click', next);
