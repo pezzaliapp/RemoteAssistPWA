@@ -1,12 +1,22 @@
-// app.js — Modalità Mobile + Laser safe + Annotazioni + PDF.js/DOCX + WebRTC + Tour
+// app.js — Modalità Mobile + Laser safe + Annotazioni + PDF.js/DOCX + WebRTC + Tour + WebBluetooth
 (() => {
+  // --- PWA install banner ---
   let deferredPrompt; const btnInstall=document.getElementById('btnInstall');
   window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferredPrompt=e; btnInstall.hidden=false; });
   btnInstall?.addEventListener('click', ()=>{ deferredPrompt?.prompt(); deferredPrompt=null; btnInstall.hidden=true; });
 
+  // --- helpers ---
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-  $$('.tab').forEach(b=>b.addEventListener('click', ()=>{ $$('.tab').forEach(t=>t.classList.remove('active')); b.classList.add('active'); $$('.panel').forEach(p=>p.classList.add('hidden')); $('#panel-'+b.dataset.tab).classList.remove('hidden'); }));
-  $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal()); $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
+
+  // Tabs
+  $$('.tab').forEach(b=>b.addEventListener('click', ()=>{
+    $$('.tab').forEach(t=>t.classList.remove('active'));
+    b.classList.add('active');
+    $$('.panel').forEach(p=>p.classList.add('hidden'));
+    $('#panel-'+b.dataset.tab).classList.remove('hidden');
+  }));
+  $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal());
+  $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
 
   // ===== Modalità Mobile: gestione toggle + auto su iOS/Android =====
   const mmToggle = document.getElementById('mobileMode');
@@ -33,7 +43,7 @@
     mmToggle?.addEventListener('change', (e)=> applyMobileMode(e.target.checked));
   })();
 
-  // Tour safe default
+  // ===== Tutorial overlay base =====
   const tourRoot = document.getElementById('tour');
   if (tourRoot) tourRoot.classList.add('hidden');
   const notour = new URL(location.href).searchParams.get('notour')==='1';
@@ -51,44 +61,193 @@
     tourRoot?.classList.remove('show'); tourRoot?.classList.add('hidden');
   }
 
+  // ===== Switch viste Standard / Glasses / Mobile =====
   const stdOnly=$('.std-only'), gOnly=$('.glasses-only'), mOnly=$('.mobile-only');
   $$('.mode').forEach(btn=>btn.addEventListener('click', ()=>{
-    $$('.mode').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+    $$('.mode').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
     const m = btn.dataset.mode;
-    stdOnly?.classList.toggle('hidden', m!=='standard'); gOnly?.classList.toggle('hidden', m!=='glasses'); mOnly?.classList.toggle('hidden', m!=='mobile');
+    stdOnly?.classList.toggle('hidden', m!=='standard');
+    gOnly?.classList.toggle('hidden', m!=='glasses');
+    mOnly?.classList.toggle('hidden', m!=='mobile');
   }));
 
+  // ===== Video / Audio local =====
   const cameraSelect=$('#cameraSelect'), videoGrid=$('#videoGrid'), micToggle=$('#micToggle');
   const btnAddCam=$('#btnAddCam'), btnStopAll=$('#btnStopAll');
   const sdpBox=$('#sdpBox'); const ghRepo=$('#ghRepo'), ghIssue=$('#ghIssue'), ghToken=$('#ghToken'), ghLog=$('#ghLog');
   const live=$('.live-indicator');
 
-  async function listCams(){ const devs=await navigator.mediaDevices.enumerateDevices(); const cams=devs.filter(d=>d.kind==='videoinput'); if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join(''); }
-  async function addCam(){ const stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined}, audio: micToggle?.checked}); addTile(stream); if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream)); }
-  function addTile(stream,label='locale'){ const wrap=document.createElement('div'); wrap.className='tile'; const v=document.createElement('video'); v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream; const lb=document.createElement('div'); lb.className='label'; lb.textContent=label; wrap.appendChild(v); wrap.appendChild(lb); videoGrid.appendChild(wrap); }
-  async function stopAll(){ $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop())); videoGrid.innerHTML=''; }
-  btnAddCam?.addEventListener('click', addCam); btnStopAll?.addEventListener('click', stopAll); navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
+  async function listCams(){
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    const cams=devs.filter(d=>d.kind==='videoinput');
+    if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join('');
+  }
+  async function addCam(){
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined},
+      audio: micToggle?.checked
+    });
+    addTile(stream);
+    if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  }
+  function addTile(stream,label='locale'){
+    const wrap=document.createElement('div');
+    wrap.className='tile';
+    const v=document.createElement('video');
+    v.autoplay=true; v.playsInline=true; v.muted=true; v.srcObject=stream;
+    const lb=document.createElement('div');
+    lb.className='label'; lb.textContent=label;
+    wrap.appendChild(v); wrap.appendChild(lb);
+    videoGrid.appendChild(wrap);
+  }
+  async function stopAll(){
+    $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>t.stop()));
+    videoGrid.innerHTML='';
+  }
+  btnAddCam?.addEventListener('click', addCam);
+  btnStopAll?.addEventListener('click', stopAll);
+  navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
 
-  // Recorder
+  // ===== Recorder =====
   let mediaRecorder, chunks=[];
   $('#btnRec')?.addEventListener('click', ()=>{
     if(!mediaRecorder || mediaRecorder.state==='inactive'){
-      const mix=new MediaStream(); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t)));
+      const mix=new MediaStream();
+      $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t)));
       mediaRecorder=new MediaRecorder(mix,{mimeType:'video/webm;codecs=vp9'});
       mediaRecorder.ondataavailable=e=>chunks.push(e.data);
-      mediaRecorder.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); chunks=[]; const url=URL.createObjectURL(blob); const a=$('#downloadRec'); a.href=url; a.download='session.webm'; a.classList.remove('hidden'); a.textContent='Scarica registrazione'; };
+      mediaRecorder.onstop=()=>{
+        const blob=new Blob(chunks,{type:'video/webm'});
+        chunks=[];
+        const url=URL.createObjectURL(blob);
+        const a=$('#downloadRec'); a.href=url; a.download='session.webm';
+        a.classList.remove('hidden'); a.textContent='Scarica registrazione';
+      };
       mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec';
-    } else { mediaRecorder.stop(); $('#btnRec').textContent='Avvia Rec'; }
+    } else {
+      mediaRecorder.stop(); $('#btnRec').textContent='Avvia Rec';
+    }
   });
 
-  // Chat helpers
+  // ====== Web Bluetooth (Smart Glasses) + Uscita audio (sinkId) ======
+  const btnBt  = document.getElementById('btnBtBattery');   // "Connetti (Web Bluetooth)"
+  const btStatus = document.getElementById('btStatus');     // stato
+  const selAudioOut = document.getElementById('audioOut');  // select uscita
+  const btnApplySink = document.getElementById('applySink');// "Applica"
+  const sinkInfo = document.getElementById('sinkInfo');
+
+  if (btnBt && btStatus) {
+    const setStatus = (txt) => { btStatus.textContent = txt; };
+
+    // Supporto Web Bluetooth (Chrome/Edge desktop e Android; NON Safari/iOS)
+    const hasBT = !!navigator.bluetooth;
+    if (!hasBT) {
+      setStatus('Web Bluetooth non supportato su questo browser.');
+      btnBt.disabled = true;
+    }
+
+    let device = null, server = null, batteryLevelChar = null;
+
+    btnBt.addEventListener('click', async () => {
+      if (!hasBT) return;
+      try {
+        setStatus('Richiesta dispositivo…');
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['battery_service']
+        });
+
+        device.addEventListener('gattserverdisconnected', () => {
+          setStatus('Disconnesso');
+          batteryLevelChar = null;
+        });
+
+        setStatus('Connessione…');
+        server = await device.gatt.connect();
+
+        // Prova a leggere la batteria
+        try {
+          const svc = await server.getPrimaryService('battery_service');
+          batteryLevelChar = await svc.getCharacteristic('battery_level');
+          const val = await batteryLevelChar.readValue();
+          const percent = val.getUint8(0);
+          setStatus(`Connesso (${device.name || 'BLE'}), Batteria: ${percent}%`);
+          batteryLevelChar.startNotifications?.().then(() => {
+            batteryLevelChar.addEventListener('characteristicvaluechanged', (e) => {
+              const p = e.target.value.getUint8(0);
+              setStatus(`Connesso (${device.name || 'BLE'}), Batteria: ${p}%`);
+            });
+          }).catch(()=>{});
+        } catch {
+          setStatus(`Connesso (${device.name || 'BLE'})`);
+        }
+      } catch (err) {
+        console.warn('WebBluetooth:', err);
+        setStatus(err?.name === 'NotFoundError' ? 'Nessun dispositivo selezionato' : `Errore: ${err.message || err}`);
+      }
+    });
+
+    // ------- Uscite audio (setSinkId) -------
+    async function populateAudioOutputs() {
+      if (!selAudioOut) return;
+
+      const canSetSink = typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
+      if (!canSetSink) {
+        selAudioOut.disabled = true;
+        btnApplySink?.setAttribute('disabled', 'disabled');
+        sinkInfo && (sinkInfo.textContent = 'Cambio uscita audio non supportato su questo browser.');
+        return;
+      }
+
+      try {
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const outs = devs.filter(d => d.kind === 'audiooutput');
+        selAudioOut.innerHTML = outs.length
+          ? outs.map(o => `<option value="${o.deviceId}">${o.label || 'Uscita audio'}</option>`).join('')
+          : `<option value="">(nessuna uscita trovata)</option>`;
+      } catch (e) {
+        console.warn('enumerateDevices:', e);
+        selAudioOut.innerHTML = `<option value="">(permessi mancanti)</option>`;
+      }
+    }
+
+    btnApplySink?.addEventListener('click', async () => {
+      const id = selAudioOut?.value || '';
+      if (!id) return;
+      const canSetSink = 'setSinkId' in HTMLMediaElement.prototype;
+      if (!canSetSink) return;
+
+      const mediaEls = Array.from(document.querySelectorAll('video, audio'));
+      try {
+        await Promise.all(mediaEls.map(el => el.setSinkId(id)));
+        sinkInfo && (sinkInfo.textContent = `Uscita impostata ✓ (${id})`);
+      } catch (e) {
+        sinkInfo && (sinkInfo.textContent = `Errore sink: ${e?.message || e}`);
+      }
+    });
+
+    if (navigator.mediaDevices?.enumerateDevices) {
+      populateAudioOutputs();
+      navigator.mediaDevices.addEventListener?.('devicechange', populateAudioOutputs);
+    }
+  }
+
+  // ===== Chat =====
   const chatLog=$('#chatLog'), chatInput=$('#chatInput');
   $('#chatSend')?.addEventListener('click', ()=>{ sendChat(chatInput.value); chatInput.value=''; });
-  function appendChat(msg,who='me'){ const div=document.createElement('div'); div.className='m'; const pfx=who==='me'?'Tu: ':who==='remote'?'Remoto: ':'· '; div.textContent=pfx+msg; chatLog?.appendChild(div); chatLog&&(chatLog.scrollTop=chatLog.scrollHeight); }
+  function appendChat(msg,who='me'){
+    const div=document.createElement('div');
+    div.className='m';
+    const pfx=who==='me'?'Tu: ':who==='remote'?'Remoto: ':'· ';
+    div.textContent=pfx+msg;
+    chatLog?.appendChild(div);
+    chatLog&&(chatLog.scrollTop=chatLog.scrollHeight);
+  }
   function sendData(o){ try{ dc?.readyState==='open' && dc.send(JSON.stringify(o)); }catch{} }
   function sendChat(text){ if(!text) return; appendChat(text,'me'); sendData({t:'chat',text}); }
 
-  // ---------- Annotazioni + Laser ----------
+  // ===== Annotazioni =====
   function initAnnotations(){
     const canvas = document.getElementById('annoCanvas');
     if(!canvas) return;
@@ -116,7 +275,12 @@
     window.addEventListener('orientationchange', sizeCanvasToParent);
     setTimeout(sizeCanvasToParent, 30);
 
-    function pt(e){ const r=canvas.getBoundingClientRect(); const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left; const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top; return {x,y}; }
+    function pt(e){
+      const r=canvas.getBoundingClientRect();
+      const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+      const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+      return {x,y};
+    }
     function seg(a,b){
       ctx.globalCompositeOperation = (mode==='pen' ? 'source-over' : 'destination-out');
       ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=+thick.value; ctx.strokeStyle='#2dd4bf';
@@ -149,7 +313,7 @@
             }
             if(m.evt==='up') last=null;
           }
-          if(m.t==='annoImage'){ /* opzionale: window.open(m.data,'_blank'); */ }
+          if(m.t==='annoImage'){ /* opzionale */ }
           if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
           if(m.t==='cursor'){ const rc=document.getElementById('remoteCursor'); if(rc){ rc.classList.remove('hidden'); const rect=document.querySelector('.docWrap').getBoundingClientRect(); rc.style.left=(m.nx*rect.width)+'px'; rc.style.top=(m.ny*rect.height)+'px'; } }
         }catch{}
@@ -158,7 +322,7 @@
   }
   initAnnotations();
 
-  // ------- Laser + documenti (+ PDF.js fix + Sync) -------
+  // ===== Laser + Documenti (PDF.js / DOCX) =====
   const docFrame=$('#docFrame'), filePicker=$('#filePicker');
   const overlay=$('#cursorOverlay'), lCursor=$('#localCursor');
   let laser=false;
@@ -170,7 +334,6 @@
   function posCursor(el, nx, ny){ const rect=$('.docWrap').getBoundingClientRect(); el.style.left=(nx*rect.width)+'px'; el.style.top=(ny*rect.height)+'px'; }
   overlay?.addEventListener('pointermove', e=>{ if(!laser) return; const rect=$('.docWrap').getBoundingClientRect(); const nx=(e.clientX-rect.left)/rect.width; const ny=(e.clientY-rect.top)/rect.height; posCursor(lCursor, nx, ny); try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'cursor', nx, ny})); }catch{} });
 
-  // PDF.js / DOCX viewer
   $('#btnPdfJs')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
     if(!url){ appendChat('Nessun documento aperto','sys'); return; }
@@ -188,10 +351,14 @@
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
   });
 
-  // file picker
-  filePicker && (filePicker.onchange=()=>{ const f=filePicker.files[0]; if(!f)return; const url=URL.createObjectURL(f); if(docFrame) docFrame.src=url; try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'docOpen', url})); }catch{} if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato in locale (blob). Per aprirlo nel viewer usa un URL web o posizionalo in /docs.', 'sys'); } });
+  filePicker && (filePicker.onchange=()=>{
+    const f=filePicker.files[0]; if(!f)return;
+    const url=URL.createObjectURL(f);
+    if(docFrame) docFrame.src=url;
+    try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'docOpen', url})); }catch{}
+    if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato in locale (blob). Per aprirlo nel viewer usa un URL web o posizionalo in /docs.', 'sys'); }
+  });
 
-  // Sync vista → remoto
   $('#btnSync')?.addEventListener('click', ()=>{
     const url = docFrame?.src || '';
     if(!dc || dc.readyState!=='open'){ appendChat('Non connesso. Apri Segnaling e collegati.', 'sys'); return; }
@@ -201,11 +368,28 @@
     appendChat('Sync inviato ✓','sys');
   });
 
-  // --------- WebRTC base + GitHub Issues (ridotto) ---------
+  // ===== WebRTC base + GitHub Issues (ridotto) =====
   let pc=null, dc=null;
-  function createPC(){ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]}); pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); }; pc.ondatachannel=e=>setupDC(e.channel); dc=pc.createDataChannel('ra'); setupDC(dc); $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject))); }
-  function setupDC(ch){ dc=ch; dc.onopen=()=>{appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle');}; dc.onclose=()=>{live?.classList.add('idle');}; dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} }; if(window.__setupDC__) window.__setupDC__(ch); }
-  async function waitIce(pc){ return new Promise(res=>{ if(pc.iceGatheringState==='complete') return res(pc.localDescription); pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); }; }); }
+  function createPC(){
+    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); };
+    pc.ondatachannel=e=>setupDC(e.channel);
+    dc=pc.createDataChannel('ra'); setupDC(dc);
+    $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject)));
+  }
+  function setupDC(ch){
+    dc=ch;
+    dc.onopen = ()=>{ appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle'); };
+    dc.onclose= ()=>{ live?.classList.add('idle'); };
+    dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} };
+    if(window.__setupDC__) window.__setupDC__(ch);
+  }
+  async function waitIce(pc){
+    return new Promise(res=>{
+      if(pc.iceGatheringState==='complete') return res(pc.localDescription);
+      pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); };
+    });
+  }
   async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
   async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
   async function applyAnswer(){ const ans=JSON.parse(sdpBox.value||'{}'); await pc.setRemoteDescription(ans); }
@@ -214,13 +398,34 @@
   document.getElementById('btnApplyAnswer')?.addEventListener('click', applyAnswer);
 
   function logGH(s){ ghLog.value+=(s+'\n'); ghLog.scrollTop=ghLog.scrollHeight; }
-  async function ghFetch(path, opts={}){ const tok=ghToken?.value?.trim?.()||''; if(!tok) throw new Error('Token mancante'); const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts}); const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; } }
+  async function ghFetch(path, opts={}){
+    const tok=ghToken?.value?.trim?.()||''; if(!tok) throw new Error('Token mancante');
+    const r=await fetch('https://api.github.com'+path, {headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+tok}, ...opts});
+    const t=await r.text(); try{ return JSON.parse(t); }catch{ return t; }
+  }
   function repoParts(){ const v=ghRepo?.value||''; const [owner,repo]=v.split('/'); return {owner,repo}; }
   document.getElementById('btnGhStart')?.addEventListener('click', ()=> logGH('Issue collegata (client-side).'));
-  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{ try{ const payload=sdpBox.value.trim(); if(!payload) return; const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]'; const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})}); logGH('Inviato '+tag+' id='+ (res.id||'?')); }catch(e){ logGH('Errore: '+e.message); } });
-  document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{ try{ const {owner,repo}=repoParts(); const issue=ghIssue.value.trim(); const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`); if(!Array.isArray(res)) return logGH('Errore risposta API'); const last=res[res.length-1]; if(!last) return logGH('Nessun commento.'); const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/); if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); } }catch(e){ logGH('Errore: '+e.message); } });
+  document.getElementById('btnGhSend')?.addEventListener('click', async ()=>{
+    try{
+      const payload=sdpBox.value.trim(); if(!payload) return;
+      const tag = payload.includes('"type":"offer"') ? '[OFFER]' : '[ANSWER]';
+      const {owner,repo}=repoParts(); const issue=ghIssue.value.trim();
+      const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`, {method:'POST', body: JSON.stringify({body: tag+"```json\n"+payload+"\n```"})});
+      logGH('Inviato '+tag+' id='+ (res.id||'?'));
+    }catch(e){ logGH('Errore: '+e.message); }
+  });
+  document.getElementById('btnGhPoll')?.addEventListener('click', async ()=>{
+    try{
+      const {owner,repo}=repoParts(); const issue=ghIssue.value.trim();
+      const res=await ghFetch(`/repos/${owner}/${repo}/issues/${issue}/comments`);
+      if(!Array.isArray(res)) return logGH('Errore risposta API');
+      const last=res[res.length-1]; if(!last) return logGH('Nessun commento.');
+      const body=last.body||''; const m=body.match(/```json\n([\s\S]*?)\n```/);
+      if(m){ sdpBox.value=m[1]; logGH('Aggiornato da commento '+last.id); } else { logGH('Nessun payload JSON.'); }
+    }catch(e){ logGH('Errore: '+e.message); }
+  });
 
-  // ---------- Tutorial ----------
+  // ===== Tutorial (passi) =====
   const tourEl = document.getElementById('tour');
   if (tourEl){
     const highlight = document.createElement('div'); highlight.className = 'tour-highlight'; tourEl.appendChild(highlight);
@@ -348,7 +553,7 @@
     });
   }
 
-  // ricarica pagina quando viene attivato un nuovo SW
+  // ===== SW: ricarica quando c’è una nuova versione =====
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
