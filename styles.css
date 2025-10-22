@@ -4,7 +4,7 @@
 *{box-sizing:border-box}
 
 /* ===== Base & scroll ===== */
-html,body{height:100%}
+html,body{min-height:100%} /* FIX: permetti al body di crescere oltre la viewport */
 body{
   margin:0;
   font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial;
@@ -12,16 +12,24 @@ body{
   background:radial-gradient(1200px 600px at 50% -20%,#172042,var(--bg));
   -webkit-overflow-scrolling: touch;   /* momentum scroll iOS */
   overflow-y:auto;                      /* body = unico scroll container */
-  touch-action: pan-y;                  /* ← consenti SEMPRE lo scroll verticale */
+  touch-action: pan-y;                  /* consenti SEMPRE lo scroll verticale */
 }
 main{
   display:flex; gap:10px;
-  /* niente height fissa: su iOS può bloccare lo scroll del body */
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - 56px);      /* niente height fissa */
+  touch-action: pan-y;
+  padding-bottom:12px;                  /* cuscinetto sopra il footer */
+}
+.sidebar{
+  width:320px;padding:10px;border-right:1px solid var(--line);
+  overflow:visible;                     /* FIX: niente scroll interno in desktop */
   touch-action: pan-y;
 }
-.sidebar{width:320px;padding:10px;border-right:1px solid var(--line);overflow:auto; touch-action: pan-y;}
-.content{flex:1;padding:10px;overflow:auto; touch-action: pan-y;}
+.content{
+  flex:1;padding:10px;
+  overflow:visible;                     /* FIX: niente scroll interno in desktop */
+  touch-action: pan-y;
+}
 
 /* ===== Header ===== */
 header{
@@ -117,7 +125,7 @@ body.mobile-mode #videoGrid{
   scroll-snap-type:x mandatory; padding-bottom:6px;
   max-height:32vh;
   -webkit-overflow-scrolling:touch;
-  touch-action: auto;                /* ← lascia passare pan-x e pan-y */
+  touch-action: auto;                /* lascia passare pan-x e pan-y */
 }
 body.mobile-mode #videoGrid *{ touch-action: auto; }
 body.mobile-mode #videoGrid .tile{min-width:56vw;scroll-snap-align:start}
