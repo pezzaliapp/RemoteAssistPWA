@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Scroll+Cam Test (grid)</title>
+  <style>
+    html,body{margin:0;height:auto;min-height:100%;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1022;color:#eaf1ff;-webkit-overflow-scrolling:touch;overflow-y:auto}
+    header{position:sticky;top:0;z-index:10;display:flex;gap:10px;align-items:center;justify-content:space-between;background:#0e1533cc;padding:10px 12px;border-bottom:1px solid #202a5a;backdrop-filter:blur(6px)}
+    main{display:block;padding:10px}
+    h1{font-size:16px;margin:0} small{color:#8ea2d0}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .card{background:linear-gradient(180deg,#0f183a,#0c1431);border:1px solid #223082;border-radius:12px;padding:12px;margin:10px 0}
+    .tabs{display:flex;gap:6px;position:sticky;top:52px;z-index:5;padding:6px 4px 0;margin:6px -4px 0;background:linear-gradient(180deg,rgba(11,16,34,.92),rgba(11,16,34,.80));backdrop-filter:blur(4px)}
+    .tab{background:#0f1a49;border:1px solid #243386;border-radius:8px;padding:6px 10px}
+    .panel{background:#0a1330;border:1px solid #243386;border-radius:10px;padding:10px;margin-top:6px}
+    .docWrap{position:relative}
+    .docPh{height:56vh;background:#050a1c;border:1px solid #1e2a64;border-radius:8px}
+    .cursorDot{position:absolute;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,#2dd4bf 0%, #2dd4bf 40%, rgba(45,212,191,0) 70%);transform:translate(-50%,-50%);box-shadow:0 0 14px rgba(45,212,191,.8)}
+    #videoGrid{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:6px 0;touch-action:auto;max-height:32vh}
+    .tile{min-width:56vw;scroll-snap-align:start;position:relative}
+    .tile video{display:block;width:100%;height:28vh;object-fit:cover;background:#050a1c;border:1px solid #1e2a64;border-radius:10px}
+    .label{position:absolute;left:6px;bottom:6px;background:#0a1330cc;border:1px solid #223082;border-radius:6px;padding:2px 6px;font-size:12px}
+    .sticky-bar{position:sticky;top:52px;z-index:4;background:transparent;padding:4px 0}
+    .footer{padding:14px 12px;border-top:1px solid #202a5a;background:#0e1533cc;color:#a3b7ea;margin-top:16px}
+    button,a{font:inherit;background:#1a275f;color:#eaf1ff;border:1px solid #2b3a86;border-radius:8px;padding:6px 10px;text-decoration:none}
+    button:disabled{opacity:.6}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong>Remote Assist • Test</strong><br />
+      <small>Scroll + Cam + Grid</small>
+    </div>
+    <div class="row">
+      <button id="btnLaser">Laser ON</button>
+      <button id="btnRec">Avvia Rec</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <h1>Video Grid (scorri la pagina sotto!)</h1>
+      <div id="videoGrid" class="card"></div>
+      <small>Il grid scorre in orizzontale, la pagina scorre in verticale (iPhone ok).</small>
+    </div>
+
+    <div class="tabs">
+      <div class="tab">Documenti</div>
+      <div class="tab">Annotazioni</div>
+      <div class="tab">Chat</div>
+      <div class="tab">Segnaling</div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <button>Sync vista → remoto</button>
+        <button>PDF.js / DOCX</button>
+      </div>
+      <div class="docWrap">
+        <div class="docPh"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Annotazioni</h3>
+      <div class="row"><button>Penna</button><button>Gomma</button><button>Pulisci</button></div>
+      <div style="height:56vh;background:#050a1c;border:1px solid #1e2a64;border-radius:8px;margin-top:8px"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Chat</h3>
+      <div style="height:40vh;background:#050a1c;border:1px solid #1e2a64;border-radius:8px;margin-bottom:8px;overflow:auto;padding:8px">Log…</div>
+      <div class="row">
+        <input placeholder="Scrivi…" style="flex:1;background:#0a1330;color:#eaf1ff;border:1px solid #253482;border-radius:8px;padding:6px 8px" />
+        <button>Invia</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Registrazione</h3>
+      <div class="row"><button id="btnDl" disabled>Scarica</button><small class="muted">— visibile per controllare lo scroll</small></div>
+    </div>
+
+    <div class="footer">© 2025 pezzaliAPP — Footer visibile = SCROLL OK</div>
+  </main>
+
+  <script>
+    (function(){
+      const $  = s => document.querySelector(s);
+      const $$ = s => Array.from(document.querySelectorAll(s));
+
+      // iOS 100vh fix
+      function setVH(){ document.documentElement.style.setProperty('--vh', (window.innerHeight*0.01) + 'px'); }
+      addEventListener('resize', setVH, {passive:true});
+      addEventListener('orientationchange', setVH, {passive:true});
+      setVH();
+
+      const grid = $('#videoGrid');
+
+      function addTile(stream, label){
+        const wrap = document.createElement('div');
+        wrap.className = 'tile';
+        const v = document.createElement('video');
+        v.autoplay = true; v.playsInline = true; v.muted = true;
+        if (stream) v.srcObject = stream;
+        const lb = document.createElement('div');
+        lb.className='label'; lb.textContent = label || 'locale';
+        wrap.appendChild(v); wrap.appendChild(lb);
+        grid.appendChild(wrap);
+      }
+
+      // Avvia subito la cam posteriore se possibile
+      (async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+          addTile(stream, 'Cam attiva');
+        } catch (e) {
+          addTile(null, 'Nessun permesso');
+        }
+      })();
+
+      // Tile demo extra per vedere il grid
+      for (let i=0;i<3;i++) addTile(null, 'Demo '+(i+1));
+
+      // Mini recorder (solo per vedere il blocco a fondo pagina)
+      const btnRec = $('#btnRec'), btnDl = $('#btnDl');
+      let rec = null, chunks = [];
+      btnRec && btnRec.addEventListener('click', () => {
+        if (!rec || rec.state === 'inactive') {
+          const mix = new MediaStream();
+          $$('#videoGrid video').forEach(v => {
+            if (v.srcObject) v.srcObject.getVideoTracks().forEach(t => mix.addTrack(t));
+          });
+          try { rec = new MediaRecorder(mix, { mimeType: 'video/webm;codecs=vp9' }); }
+          catch { rec = new MediaRecorder(mix); }
+          rec.ondataavailable = e => chunks.push(e.data);
+          rec.onstop = () => {
+            const blob = new Blob(chunks, { type:'video/webm' }); chunks = [];
+            const url = URL.createObjectURL(blob);
+            btnDl.removeAttribute('disabled');
+            btnDl.onclick = () => { location.href = url; };
+          };
+          rec.start(); btnRec.textContent = 'Ferma Rec';
+        } else {
+          rec.stop(); btnRec.textContent = 'Avvia Rec';
+        }
+      });
+
+      // Laser fake toggle (solo UI)
+      const btnLaser = $('#btnLaser');
+      let laser = false;
+      btnLaser && btnLaser.addEventListener('click', () => {
+        laser = !laser;
+        btnLaser.textContent = laser ? 'Laser OFF' : 'Laser ON';
+      });
+    })();
+  </script>
+</body>
+</html>
