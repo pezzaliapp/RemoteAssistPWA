@@ -1,5 +1,5 @@
 // sw.js — auto-refresh on activate
-const CACHE='pezzaliapp-remoteassist-v1';
+const CACHE='pezzaliapp-remoteassist-v2';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/pezzaliAPP-logo.svg','./docs/sample.pdf','./docs/bg.jpg','./docs/guida.html'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{
