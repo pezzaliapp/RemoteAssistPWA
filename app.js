@@ -885,6 +885,46 @@
     });
   }
 
+  // ===== Avvisi ambiente: secure context (HTTPS) + limiti iOS Safari =====
+  (function initEnvNotices(){
+    const notices=[];
+
+    // 1) Secure context: camera, microfono e WebRTC richiedono HTTPS.
+    if(window.isSecureContext===false){
+      notices.push('Camera, microfono e connessione remota richiedono HTTPS. Apri l’app da GitHub Pages o da un dominio sicuro.');
+      ['#btnAddCam','#btnRearCam','#btnTorch','#btnFullscreen','#btnLock','#btnRec',
+       '#btnBtBattery','#btnJoin','#btnMakeOffer','#btnMakeAnswer','#btnApplyAnswer']
+        .forEach(sel=>{ const el=$(sel); if(el){ el.disabled=true; el.title='Richiede HTTPS (contesto sicuro)'; } });
+    }
+
+    // 2) iOS / iPadOS Safari: rilevamento prudente (iPadOS si maschera da Mac).
+    const ua=navigator.userAgent||'';
+    const isIOS = /iP(hone|od|ad)/.test(ua) ||
+                  (navigator.platform==='MacIntel' && (navigator.maxTouchPoints||0)>1);
+    const isSafari = /safari/i.test(ua) && !/(chrome|crios|fxios|edgios|android)/i.test(ua);
+    if(isIOS && isSafari){
+      notices.push('Su iPhone alcune funzioni come torcia o registrazione possono non essere disponibili per limiti del browser.');
+      // Registrazione: se MediaRecorder manca, non presentarla come funzione attiva.
+      if(typeof MediaRecorder==='undefined'){
+        const r=$('#btnRec'); if(r){ r.disabled=true; r.title='Registrazione non supportata su questo browser'; }
+      }
+      // Torcia: non supportata via getUserMedia su iOS Safari.
+      const t=$('#btnTorch'); if(t){ t.disabled=true; t.title='Torcia non disponibile su iPhone'; }
+    }
+
+    if(!notices.length) return;
+    const bar=document.createElement('div');
+    bar.className='app-notice'; bar.setAttribute('role','status');
+    const txt=document.createElement('span'); txt.textContent='⚠️ '+notices.join(' · ');
+    const close=document.createElement('button');
+    close.type='button'; close.className='app-notice-x'; close.setAttribute('aria-label','Chiudi'); close.textContent='✕';
+    close.addEventListener('click', ()=> bar.remove());
+    bar.appendChild(txt); bar.appendChild(close);
+    const header=document.querySelector('header');
+    if(header && header.parentNode){ header.parentNode.insertBefore(bar, header.nextSibling); }
+    else { document.body.insertBefore(bar, document.body.firstChild); }
+  })();
+
   // ===== SW: registrazione (spostata da index.html per la CSP) + ricarica su nuova versione =====
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {

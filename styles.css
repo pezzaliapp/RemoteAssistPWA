@@ -150,6 +150,11 @@ body.mobile-mode .tabs{
 /* ===== Avviso (es. privacy signaling) ===== */
 .warn{color:#fcd34d;background:rgba(252,211,77,.08);border:1px solid rgba(252,211,77,.35);border-radius:8px;padding:8px 10px;margin:6px 0}
 
+/* ===== Banner avviso ambiente (secure context / limiti iOS) ===== */
+.app-notice{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 12px;background:rgba(252,211,77,.10);border-bottom:1px solid rgba(252,211,77,.35);color:#fde68a;font-size:13px;line-height:1.35}
+.app-notice-x{flex:0 0 auto;background:transparent;border:0;color:#fde68a;font-size:14px;line-height:1;cursor:pointer;padding:4px 6px;min-height:auto}
+.app-notice-x:hover{filter:brightness(1.15)}
+
 /* ===== Smartphone (<=600px): layout professionale, in colonna, senza overflow ===== */
 @media (max-width: 600px){
   /* Niente scroll orizzontale + rispetto delle safe-area iPhone (notch / home indicator) */
