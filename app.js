@@ -252,17 +252,35 @@
 
   // ===== Recorder =====
   let mediaRecorder, chunks=[];
+  // BUG-07: scegli il primo mimeType supportato (Safari non supporta WebM/VP9).
+  function pickRecMime(){
+    if(typeof MediaRecorder==='undefined' || !MediaRecorder.isTypeSupported) return '';
+    const candidates=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+    return candidates.find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  }
   $('#btnRec')?.addEventListener('click', ()=>{
+    if(typeof MediaRecorder==='undefined'){ appendChat('Registrazione non supportata su questo browser','sys'); return; }
     if(!mediaRecorder || mediaRecorder.state==='inactive'){
       const mix=new MediaStream();
       $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t)));
-      mediaRecorder=new MediaRecorder(mix,{mimeType:'video/webm;codecs=vp9'});
-      mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+      if(mix.getTracks().length===0){ appendChat('Nessuna camera attiva da registrare. Aggiungi una sorgente video.','sys'); return; }
+      const mime=pickRecMime();
+      try{
+        mediaRecorder = mime ? new MediaRecorder(mix,{mimeType:mime}) : new MediaRecorder(mix);
+      }catch(err){
+        console.warn('MediaRecorder:', err);
+        appendChat('Registrazione non avviabile: '+(err?.message||err),'sys');
+        return;
+      }
+      const recType=mediaRecorder.mimeType||mime||'video/webm';
+      const ext=recType.includes('mp4')?'mp4':'webm';
+      chunks=[];
+      mediaRecorder.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
       mediaRecorder.onstop=()=>{
-        const blob=new Blob(chunks,{type:'video/webm'});
+        const blob=new Blob(chunks,{type:recType});
         chunks=[];
         const url=URL.createObjectURL(blob);
-        const a=$('#downloadRec'); a.href=url; a.download='session.webm';
+        const a=$('#downloadRec'); a.href=url; a.download='session.'+ext;
         a.classList.remove('hidden'); a.textContent='Scarica registrazione';
       };
       mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec';
