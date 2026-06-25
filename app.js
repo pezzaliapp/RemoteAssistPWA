@@ -167,6 +167,77 @@
   btnStopAll?.addEventListener('click', stopAll);
   navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
 
+  // ===== Modalità Mobile Cam: camera posteriore, torch, fullscreen, blocco orientamento =====
+  // Feature-detection + degradazione con grazia: nessun pulsante resta "morto" (BUG-02).
+  (function initMobileCam(){
+    const btnRear=$('#btnRearCam'), btnTorch=$('#btnTorch'), btnFull=$('#btnFullscreen'), btnLock=$('#btnLock');
+    let rearTile=null, rearTrack=null, torchOn=false;
+
+    btnRear?.addEventListener('click', async ()=>{
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({
+          video:{facingMode:{ideal:'environment'}}, audio:false
+        });
+        rearTile=addTile(stream,'posteriore');
+        rearTrack=stream.getVideoTracks()[0]||null;
+        if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+        // Abilita il torch solo se la track lo supporta.
+        const caps=rearTrack?.getCapabilities?.()||{};
+        if(btnTorch){
+          if('torch' in caps){ btnTorch.disabled=false; }
+          else { btnTorch.disabled=true; btnTorch.title='Torch non supportato su questo dispositivo'; }
+        }
+      }catch(err){
+        console.warn('rearCam:', err);
+        appendChat('Camera posteriore non disponibile: '+(err?.message||err),'sys');
+      }
+    });
+
+    btnTorch?.addEventListener('click', async ()=>{
+      if(!rearTrack){ appendChat('Avvia prima la camera posteriore','sys'); return; }
+      const caps=rearTrack.getCapabilities?.()||{};
+      if(!('torch' in caps)){ btnTorch.disabled=true; appendChat('Torch non supportato','sys'); return; }
+      try{
+        torchOn=!torchOn;
+        await rearTrack.applyConstraints({advanced:[{torch:torchOn}]});
+        btnTorch.textContent=torchOn?'Torch OFF':'Torch ON';
+      }catch(err){
+        console.warn('torch:', err);
+        appendChat('Torch non attivabile: '+(err?.message||err),'sys');
+      }
+    });
+
+    btnFull?.addEventListener('click', async ()=>{
+      const target=videoGrid||document.body;
+      try{
+        if(document.fullscreenElement){ await document.exitFullscreen(); }
+        else if(target.requestFullscreen){ await target.requestFullscreen(); }
+        else { appendChat('Fullscreen non supportato su questo browser','sys'); }
+      }catch(err){
+        console.warn('fullscreen:', err);
+        appendChat('Fullscreen non disponibile: '+(err?.message||err),'sys');
+      }
+    });
+
+    // Blocco orientamento: supportato solo su alcuni browser (Chrome Android) e in fullscreen.
+    if(btnLock){
+      const canLock = !!(screen.orientation && typeof screen.orientation.lock==='function');
+      if(!canLock){ btnLock.disabled=true; btnLock.title='Blocco orientamento non supportato'; }
+      btnLock.addEventListener('click', async ()=>{
+        try{
+          if(!document.fullscreenElement && (videoGrid||document.body).requestFullscreen){
+            await (videoGrid||document.body).requestFullscreen();
+          }
+          await screen.orientation.lock('portrait');
+          appendChat('Orientamento bloccato in verticale','sys');
+        }catch(err){
+          console.warn('orientation.lock:', err);
+          appendChat('Blocco orientamento non riuscito: '+(err?.message||err),'sys');
+        }
+      });
+    }
+  })();
+
   // ===== Recorder =====
   let mediaRecorder, chunks=[];
   $('#btnRec')?.addEventListener('click', ()=>{
