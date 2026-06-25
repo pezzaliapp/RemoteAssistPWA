@@ -105,7 +105,8 @@ footer.legal a{color:#cde4ff}
 
 /* ===== Modalità Mobile (classe) ===== */
 body.mobile-mode{ -webkit-overflow-scrolling:touch; }
-body.mobile-mode html, body.mobile-mode body{height:auto;min-height:100%}
+/* su mobile lo scroll è quello nativo del documento (più affidabile su iOS) */
+body.mobile-mode html, body.mobile-mode body{height:auto;min-height:100%;overflow:visible}
 body.mobile-mode main{flex-direction:column;min-height:auto !important;}
 body.mobile-mode .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--line)}
 body.mobile-mode .sidebar, body.mobile-mode .content{overflow:visible !important}
@@ -136,7 +137,7 @@ body.mobile-mode .tabs{
 
 /* ===== Fallback mobile ANCHE senza toggle ===== */
 @media (max-width: 820px){
-  html, body { height:auto; min-height:100%; }
+  html, body { height:auto; min-height:100%; overflow:visible; }
   main{ flex-direction:column !important; min-height:auto !important; }
   .sidebar, .content{ overflow:visible !important; width:auto; touch-action: pan-y; }
   #videoGrid{
@@ -258,7 +259,8 @@ body.mobile-mode .tabs{
 .disclaimer-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,10,28,.72);backdrop-filter:blur(4px);overflow:auto;-webkit-overflow-scrolling:touch}
 .disclaimer-overlay.hidden{display:none}
 /* su schermi bassi la card non deve nascondere il bottone: scorre internamente */
-.disclaimer-card{max-width:520px;width:100%;max-height:calc(100vh - 32px);overflow:auto;-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,#0f183a,#0c1431);border:1px solid #223082;border-radius:14px;padding:18px 20px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.disclaimer-card{max-width:520px;width:100%;min-width:0;max-height:calc(100vh - 32px);overflow:auto;-webkit-overflow-scrolling:touch;overflow-wrap:break-word;background:linear-gradient(180deg,#0f183a,#0c1431);border:1px solid #223082;border-radius:14px;padding:18px 20px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.disclaimer-card .row{position:sticky;bottom:0;background:#0c1431;padding-top:10px;margin-top:4px}
 .disclaimer-card h3{margin:0 0 10px 0;font-size:17px}
 .disclaimer-card p{margin:8px 0;color:var(--ink)}
 .disclaimer-card ul{margin:8px 0 14px 0;padding-left:18px;color:#c3d3f5}
