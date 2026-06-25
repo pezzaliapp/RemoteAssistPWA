@@ -156,8 +156,23 @@
 
   <footer class="legal">
     © 2025 Alessandro Pezzali — pezzaliAPP.com · Tutti i diritti riservati — Uso con licenza ·
-    Contatti: <a href="mailto:info@alessandropezzali.it">info@alessandropezzali.it</a>
+    Contatti: <a href="mailto:info@alessandropezzali.it">info@alessandropezzali.it</a> ·
+    <a id="openDisclaimer" href="#">Note legali / Disclaimer</a>
   </footer>
+
+  <!-- Disclaimer al primo avvio (riapribile dal footer) -->
+  <div id="disclaimer" class="disclaimer-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="disclaimerTitle">
+    <div class="disclaimer-card">
+      <h3 id="disclaimerTitle">Note legali — pezzaliAPP Remote Assist</h3>
+      <p>Questa app è fornita <b>“così com’è”, senza garanzie</b> di alcun tipo, esplicite o implicite.</p>
+      <ul>
+        <li>L’operatore è responsabile del rispetto della <b>privacy</b>, della raccolta del <b>consenso alla ripresa</b> di persone e luoghi inquadrati e della <b>connettività</b> necessaria alla sessione.</li>
+        <li>Un <b>TURN di terzi</b> instrada il traffico ma <b>non ne legge i contenuti</b> (media cifrato <b>DTLS</b>); vede però gli <b>indirizzi IP</b> dei partecipanti.</li>
+        <li><b>Testare sempre</b> la catena completa (camera, TURN, signaling) <b>prima</b> dell’uso sul campo.</li>
+      </ul>
+      <div class="row"><button id="disclaimerOk" class="cta-btn">Ho capito</button></div>
+    </div>
+  </div>
 
   <dialog id="help">
     <h3>Guida rapida</h3>
@@ -166,6 +181,17 @@
       <li>Usa la tab <b>Segnaling</b> per collegarti (Manuale o GitHub Issues).</li>
       <li>Con <b>Laser</b> e <b>Annotazioni</b> guidi l’intervento “chirurgico”.</li>
     </ol>
+    <h3>Perché questa app e non una videochiamata</h3>
+    <p class="muted">Se ti serve <b>solo parlare</b> e mostrare qualcosa genericamente, una normale videochiamata basta. Questa app serve quando l’assistenza è <b>tecnica</b> e la precisione conta:</p>
+    <ul>
+      <li><b>Puntatore laser preciso</b> sul video o sul documento del cliente: “quella vite lì” diventa <b>un punto esatto</b>, non parole.</li>
+      <li><b>Annotazioni</b> su schemi e foto condivisi col remoto.</li>
+      <li><b>PDF e manuali sincronizzati</b>: si guarda tutti la stessa pagina, lo stesso dettaglio.</li>
+      <li><b>POV a mani libere</b>: camera posteriore, torch e supporto a smart glasses.</li>
+      <li><b>Registrazione</b> della sessione per documentare l’intervento.</li>
+      <li><b>PWA brandizzata e installabile</b>, invece di un’app consumer generica.</li>
+      <li>Il <b>media è P2P, cifrato end-to-end</b> (DTLS-SRTP): audio/video viaggiano direttamente tra i dispositivi.</li>
+    </ul>
     <button id="startTour">🧭 Avvia guida qui</button>
     <button id="closeHelp">Chiudi</button>
   </dialog>
