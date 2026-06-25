@@ -147,37 +147,55 @@ body.mobile-mode .tabs{
   #videoGrid *{ touch-action:auto; }
 }
 
-/* ===== Schermi stretti (iPhone ~390px): tutto in colonna, niente overflow ===== */
-@media (max-width: 600px){
-  /* Nessuno scroll orizzontale della pagina */
-  html, body{ max-width:100%; overflow-x:hidden; }
+/* ===== Avviso (es. privacy signaling) ===== */
+.warn{color:#fcd34d;background:rgba(252,211,77,.08);border:1px solid rgba(252,211,77,.35);border-radius:8px;padding:8px 10px;margin:6px 0}
 
-  /* Header impilato: brand su una riga leggibile, toggle e nav sotto */
-  header{ flex-direction:column; align-items:stretch; gap:10px; }
-  .brand{ gap:10px; min-width:0; }
-  .title{ min-width:0; flex:1 1 auto; }       /* il titolo usa la larghezza piena, niente wrap parola-per-parola */
+/* ===== Smartphone (<=600px): layout professionale, in colonna, senza overflow ===== */
+@media (max-width: 600px){
+  /* Niente scroll orizzontale + rispetto delle safe-area iPhone (notch / home indicator) */
+  html, body{ max-width:100%; overflow-x:hidden; }
+  body{ padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Header impilato e compatto: scorre con la pagina (header alto sticky ruberebbe spazio) */
+  header{
+    position:static; flex-direction:column; align-items:stretch; gap:10px;
+    padding:max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+  }
+  .brand{ gap:10px; min-width:0; align-items:center; }
+  .title{ min-width:0; flex:1 1 auto; }       /* titolo a larghezza piena: niente wrap parola-per-parola */
   .title strong{ font-size:15px; line-height:1.2; }
   .title .subtitle{ font-size:11px; }
-  .mobile-toggle{ margin-right:0; }
+  .mobile-toggle{ margin-right:0; align-self:flex-start }
 
-  /* I pulsanti nav vanno a capo senza accavallarsi, area di tocco >= 44px */
-  nav{ display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+  /* Barra pulsanti ordinata, area di tocco >= 44px */
+  nav{ display:flex; flex-wrap:wrap; gap:8px; width:100% }
   nav button:not([hidden]), nav a{
-    flex:1 1 auto; min-height:44px;
+    flex:1 1 auto; min-height:44px; border-radius:10px;
     display:inline-flex; align-items:center; justify-content:center; text-align:center;
   }
 
-  /* Modalità e tab a tutta larghezza, su più righe se serve, senza tagli */
-  .modes, .tabs{ flex-wrap:wrap; }
-  .mode, .tab{ flex:1 1 auto; text-align:center; }
+  /* Modalità e tab come "segmented control" a tutta larghezza, tutte visibili (nessun taglio) */
+  .modes{ gap:6px }
+  .mode{ flex:1 1 0; min-width:0; text-align:center }
+  .tabs{ gap:4px }
+  .tab{ flex:1 1 0; min-width:0; text-align:center; padding:8px 4px; font-size:13px }
+  body.mobile-mode .tabs{ top:0 }             /* sticky in cima, sotto l'header statico */
 
-  /* Area di tocco adeguata su tutti i controlli (esclusi checkbox/range) */
+  /* Pannelli compatti: niente min-height fisso che lascia vuoti enormi */
+  .panel{ min-height:auto }
+
+  /* Area di tocco >= 44px sui controlli (esclusi checkbox/range) */
   button, .mode, .tab,
-  input:not([type="checkbox"]):not([type="range"]), select{ min-height:44px; }
+  input:not([type="checkbox"]):not([type="range"]), select{ min-height:44px }
 
-  /* Campi e contenuti non superano mai la larghezza dello schermo */
-  input, select, textarea{ max-width:100%; }
-  .sidebar, .content{ padding:10px; }
+  /* Campi a tutta larghezza: niente input strozzati su una riga */
+  input, select, textarea{ max-width:100% }
+  .controls select, #cameraSelect{ width:100% }
+  .row > button{ flex:1 1 auto }              /* es. Entra/Esci affiancati e ampi */
+
+  /* Respiro coerente di card e contenuti */
+  .sidebar, .content{ padding:10px }
+  .card{ padding:14px; border-radius:14px }
 }
 
 /* ===== Tutorial overlay ===== */
