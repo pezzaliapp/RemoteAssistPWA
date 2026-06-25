@@ -579,6 +579,42 @@
   document.getElementById('btnMakeAnswer')?.addEventListener('click', makeAnswerFromOffer);
   document.getElementById('btnApplyAnswer')?.addEventListener('click', applyAnswer);
 
+  // ===== Sessione: Entra / Esci + selettore signaling (BUG-03, BUG-04) =====
+  const roleSel=$('#role'), sigModeSel=$('#sigMode'), ghBox2=$('#ghBox2');
+  function openTab(name){ document.querySelector(`.tab[data-tab="${name}"]`)?.click(); }
+
+  // BUG-04: mostra il box GitHub solo quando il signaling scelto è "github".
+  function applySigMode(){
+    if(!ghBox2) return;
+    ghBox2.classList.toggle('hidden', (sigModeSel?.value||'manual')!=='github');
+  }
+  sigModeSel?.addEventListener('change', applySigMode);
+  applySigMode(); // default: Manuale -> box GitHub nascosto
+
+  $('#btnJoin')?.addEventListener('click', async ()=>{
+    if(pc){ appendChat('Sessione già avviata. Premi "Esci" per chiuderla.','sys'); openTab('signal'); return; }
+    const role=roleSel?.value||'tech';
+    openTab('signal');
+    live?.classList.remove('idle');
+    if(role==='tech'){
+      appendChat('Ruolo Tecnico: genero l\'offerta, copiala al partner.','sys');
+      await makeOffer();
+    } else {
+      createPC();
+      appendChat('Ruolo Esperto: incolla l\'offerta ricevuta e premi "Crea Risposta da Offerta".','sys');
+    }
+  });
+
+  $('#btnLeave')?.addEventListener('click', ()=>{
+    try{ dc?.close?.(); }catch(e){ console.warn('dc.close:', e); }
+    try{ pc?.close?.(); }catch(e){ console.warn('pc.close:', e); }
+    pc=null; dc=null;
+    stopAll();
+    if(sdpBox) sdpBox.value='';
+    live?.classList.add('idle');
+    appendChat('Sessione chiusa.','sys');
+  });
+
   function logGH(s){ ghLog.value+=(s+'\n'); ghLog.scrollTop=ghLog.scrollHeight; }
   async function ghFetch(path, opts={}){
     const tok=ghToken?.value?.trim?.()||''; if(!tok) throw new Error('Token mancante');
