@@ -472,7 +472,12 @@
             }
             if(m.evt==='up') last=null;
           }
-          if(m.t==='annoImage'){ /* opzionale */ }
+          if(m.t==='annoImage' && m.data){ // BUG-10: disegna lo schema ricevuto
+            const img=new Image();
+            img.onload=()=>{ try{ ctx.drawImage(img,0,0,canvas.width,canvas.height); }catch(e){ console.warn('annoImage draw:', e); } };
+            img.onerror=()=>console.warn('annoImage: immagine non valida');
+            img.src=m.data;
+          }
           if(m.t==='docOpen'){
             const df=document.getElementById('docFrame');
             const url=safeDocUrl(m.url);
