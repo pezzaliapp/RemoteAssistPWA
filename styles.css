@@ -196,3 +196,6 @@ body.mobile-mode .tabs{
   body.mobile-mode #docFrame{ height: calc(var(--vh, 1vh) * 56) !important; }
   body.mobile-mode .anno-wrap{ height: calc(var(--vh, 1vh) * 56) !important; }
 }
+
+/* Avviso privacy signaling GitHub (SEC-02) */
+.warn{color:#fcd34d;background:rgba(252,211,77,.08);border:1px solid rgba(252,211,77,.35);border-radius:8px;padding:8px 10px;margin:6px 0}

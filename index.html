@@ -133,6 +133,9 @@
         <label>Offerta / Risposta (SDP JSON):<textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea></label>
         <div class="muted">
           <p><b>GitHub Issues (beta)</b>: usa un issue come stanza e scambia OFFER/ANSWER nei commenti.</p>
+          <p class="warn" role="alert">⚠️ <b>Privacy:</b> l'SDP scambiato contiene i tuoi indirizzi IP (locali e pubblici).
+          Su un issue <b>pubblico</b> diventano leggibili da chiunque. Usa un repo/issue <b>privato</b>
+          e un <b>token fine-grained</b> con accesso al solo repo necessario.</p>
           <div id="ghBox2">
             <div class="row"><input id="ghRepo" placeholder="owner/repo"><input id="ghIssue" placeholder="# Issue"><input id="ghToken" type="password" placeholder="ghp_..."></div>
             <div class="row"><button id="btnGhStart">Collega Issue</button><button id="btnGhSend">Invia su Issue</button><button id="btnGhPoll">Aggiorna da Issue</button></div>
