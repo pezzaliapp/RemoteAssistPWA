@@ -100,12 +100,21 @@
     if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join('');
   }
   async function addCam(){
-    const stream=await navigator.mediaDevices.getUserMedia({
-      video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined},
-      audio: micToggle?.checked
-    });
-    addTile(stream);
-    if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined},
+        audio: micToggle?.checked
+      });
+      addTile(stream);
+      if(pc){
+        stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+        // Camera aggiunta dopo la connessione: rinegozia (vedi onnegotiationneeded).
+      }
+      listCams().catch(()=>{}); // ora con permesso le etichette si popolano
+    }catch(err){
+      console.warn('addCam:', err);
+      appendChat('Impossibile aggiungere la camera: '+(err?.message||err),'sys');
+    }
   }
   function addTile(stream,label='locale'){
     const wrap=document.createElement('div');
@@ -165,7 +174,10 @@
   }
   btnAddCam?.addEventListener('click', addCam);
   btnStopAll?.addEventListener('click', stopAll);
-  navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
+  // BUG-05: niente prompt camera all'avvio. Enumeriamo i device senza chiedere
+  // permessi (le etichette restano vuote finche l'utente non preme "Aggiungi").
+  listCams().catch(e=>console.warn('listCams:', e));
+  navigator.mediaDevices?.addEventListener?.('devicechange', ()=>listCams().catch(()=>{}));
 
   // ===== Modalità Mobile Cam: camera posteriore, torch, fullscreen, blocco orientamento =====
   // Feature-detection + degradazione con grazia: nessun pulsante resta "morto" (BUG-02).
@@ -567,14 +579,46 @@
     if(window.__setupDC__) window.__setupDC__(ch);
   }
   async function waitIce(pc){
+    // BUG-08: non bloccarsi se lo STUN è irraggiungibile: risolvi con la
+    // localDescription (anche parziale) dopo un timeout.
     return new Promise(res=>{
       if(pc.iceGatheringState==='complete') return res(pc.localDescription);
-      pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); };
+      let done=false;
+      const finish=()=>{ if(done) return; done=true; res(pc.localDescription); };
+      pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') finish(); };
+      setTimeout(finish, 2000);
     });
   }
-  async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
-  async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
-  async function applyAnswer(){ const ans=JSON.parse(sdpBox.value||'{}'); await pc.setRemoteDescription(ans); }
+  async function makeOffer(){
+    try{
+      createPC();
+      const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+      await pc.setLocalDescription(off);
+      const sdp=await waitIce(pc);
+      sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp});
+      appendChat('Offerta generata: copiala e inviala al partner.','sys');
+    }catch(err){ console.warn('makeOffer:', err); appendChat('Errore generando l\'offerta: '+(err?.message||err),'sys'); }
+  }
+  async function makeAnswerFromOffer(){
+    try{
+      const offer=JSON.parse(sdpBox.value||'{}');
+      createPC();
+      await pc.setRemoteDescription(offer);
+      const ans=await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      const sdp=await waitIce(pc);
+      sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp});
+      appendChat('Risposta creata: inviala al partner.','sys');
+    }catch(err){ console.warn('makeAnswer:', err); appendChat('Offerta non valida o errore: '+(err?.message||err),'sys'); }
+  }
+  async function applyAnswer(){
+    if(!pc){ appendChat('Genera prima un\'offerta.','sys'); return; } // BUG-09
+    try{
+      const ans=JSON.parse(sdpBox.value||'{}');
+      await pc.setRemoteDescription(ans);
+      appendChat('Risposta applicata.','sys');
+    }catch(err){ console.warn('applyAnswer:', err); appendChat('Risposta non valida: '+(err?.message||err),'sys'); }
+  }
   document.getElementById('btnMakeOffer')?.addEventListener('click', makeOffer);
   document.getElementById('btnMakeAnswer')?.addEventListener('click', makeAnswerFromOffer);
   document.getElementById('btnApplyAnswer')?.addEventListener('click', applyAnswer);
