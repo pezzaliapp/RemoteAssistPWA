@@ -18,6 +18,22 @@
   $('#btnHelp')?.addEventListener('click', ()=>$('#help').showModal());
   $('#closeHelp')?.addEventListener('click', ()=>$('#help').close());
 
+  // ===== Disclaimer / Note legali (primo avvio + link nel footer) =====
+  (function initDisclaimer(){
+    const ov=$('#disclaimer');
+    if(!ov) return;
+    const KEY='disclaimer-accepted';
+    const open =()=>ov.classList.remove('hidden');
+    const close=()=>ov.classList.add('hidden');
+    let accepted=null; try{ accepted=localStorage.getItem(KEY); }catch(e){ console.warn('disclaimer storage:', e); }
+    if(accepted!=='1') open(); // mostrato solo al primo avvio
+    $('#disclaimerOk')?.addEventListener('click', ()=>{
+      try{ localStorage.setItem(KEY,'1'); }catch(e){ console.warn('disclaimer storage:', e); }
+      close();
+    });
+    $('#openDisclaimer')?.addEventListener('click', e=>{ e.preventDefault(); open(); });
+  })();
+
   // ===== Modalità Mobile: gestione toggle + auto su iOS/Android =====
   const mmToggle = document.getElementById('mobileMode');
   function setVHVar(){ const vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); }

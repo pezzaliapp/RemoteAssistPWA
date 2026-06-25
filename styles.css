@@ -196,3 +196,14 @@ body.mobile-mode .tabs{
   body.mobile-mode #docFrame{ height: calc(var(--vh, 1vh) * 56) !important; }
   body.mobile-mode .anno-wrap{ height: calc(var(--vh, 1vh) * 56) !important; }
 }
+
+/* ===== Disclaimer / Note legali (overlay primo avvio) ===== */
+.disclaimer-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,10,28,.72);backdrop-filter:blur(4px)}
+.disclaimer-overlay.hidden{display:none}
+.disclaimer-card{max-width:520px;width:100%;background:linear-gradient(180deg,#0f183a,#0c1431);border:1px solid #223082;border-radius:14px;padding:18px 20px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.disclaimer-card h3{margin:0 0 10px 0;font-size:17px}
+.disclaimer-card p{margin:8px 0;color:var(--ink)}
+.disclaimer-card ul{margin:8px 0 14px 0;padding-left:18px;color:#c3d3f5}
+.disclaimer-card li{margin:6px 0}
+.cta-btn{background:var(--cta);color:#06231f;border:1px solid var(--cta);font-weight:600}
+.cta-btn:hover{filter:brightness(1.08)}
