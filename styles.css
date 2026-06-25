@@ -147,6 +147,39 @@ body.mobile-mode .tabs{
   #videoGrid *{ touch-action:auto; }
 }
 
+/* ===== Schermi stretti (iPhone ~390px): tutto in colonna, niente overflow ===== */
+@media (max-width: 600px){
+  /* Nessuno scroll orizzontale della pagina */
+  html, body{ max-width:100%; overflow-x:hidden; }
+
+  /* Header impilato: brand su una riga leggibile, toggle e nav sotto */
+  header{ flex-direction:column; align-items:stretch; gap:10px; }
+  .brand{ gap:10px; min-width:0; }
+  .title{ min-width:0; flex:1 1 auto; }       /* il titolo usa la larghezza piena, niente wrap parola-per-parola */
+  .title strong{ font-size:15px; line-height:1.2; }
+  .title .subtitle{ font-size:11px; }
+  .mobile-toggle{ margin-right:0; }
+
+  /* I pulsanti nav vanno a capo senza accavallarsi, area di tocco >= 44px */
+  nav{ display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+  nav button:not([hidden]), nav a{
+    flex:1 1 auto; min-height:44px;
+    display:inline-flex; align-items:center; justify-content:center; text-align:center;
+  }
+
+  /* Modalità e tab a tutta larghezza, su più righe se serve, senza tagli */
+  .modes, .tabs{ flex-wrap:wrap; }
+  .mode, .tab{ flex:1 1 auto; text-align:center; }
+
+  /* Area di tocco adeguata su tutti i controlli (esclusi checkbox/range) */
+  button, .mode, .tab,
+  input:not([type="checkbox"]):not([type="range"]), select{ min-height:44px; }
+
+  /* Campi e contenuti non superano mai la larghezza dello schermo */
+  input, select, textarea{ max-width:100%; }
+  .sidebar, .content{ padding:10px; }
+}
+
 /* ===== Tutorial overlay ===== */
 .tour{position:fixed;inset:0;z-index:9999}
 .tour.hidden{display:none}
