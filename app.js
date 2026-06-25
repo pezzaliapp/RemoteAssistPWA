@@ -581,12 +581,44 @@
   });
 
   // ===== WebRTC base + GitHub Issues (ridotto) =====
-  let pc=null, dc=null;
-  function createPC(){
-    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  let pc=null, dc=null, isOfferer=false;
+
+  // Lista ICE configurabile (oggetto qui o JSON in localStorage 'iceServers').
+  // NB: solo STUN non basta su NAT simmetrici / reti mobili o aziendali: per reti
+  // reali serve un TURN. Aggiungilo qui o via localStorage — NON inseriamo
+  // credenziali TURN di default per non spedire segreti nel repo.
+  const DEFAULT_ICE=[{urls:'stun:stun.l.google.com:19302'}];
+  function getIceServers(){
+    try{ const j=localStorage.getItem('iceServers'); if(j){ const a=JSON.parse(j); if(Array.isArray(a)&&a.length) return a; } }
+    catch(e){ console.warn('iceServers config:', e); }
+    return DEFAULT_ICE;
+  }
+
+  function createPC(asOfferer=false){
+    isOfferer=!!asOfferer;
+    pc=new RTCPeerConnection({iceServers:getIceServers()});
     pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); };
     pc.ondatachannel=e=>setupDC(e.channel);
-    dc=pc.createDataChannel('ra'); setupDC(dc);
+    pc.onconnectionstatechange=()=>{
+      const st=pc.connectionState;
+      if(st==='connected') live?.classList.remove('idle');
+      else if(st==='disconnected'||st==='failed'||st==='closed') live?.classList.add('idle');
+      if(st==='failed') appendChat('Connessione fallita (probabile NAT/firewall: serve un TURN).','sys');
+    };
+    // Camera aggiunta a caldo: l'offerer rigenera l'offerta (manual signaling => va re-inviata).
+    pc.onnegotiationneeded=async ()=>{
+      if(!isOfferer || !dc || dc.readyState!=='open') return;
+      try{
+        const off=await pc.createOffer();
+        await pc.setLocalDescription(off);
+        const sdp=await waitIce(pc);
+        sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp});
+        appendChat('Nuova sorgente: offerta rigenerata — invia di nuovo l\'SDP al partner.','sys');
+        openTab('signal');
+      }catch(err){ console.warn('renegotiate:', err); }
+    };
+    // Solo l'offerer crea il data channel; l'answerer lo riceve via ondatachannel (no doppio canale).
+    if(asOfferer){ dc=pc.createDataChannel('ra'); setupDC(dc); }
     $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject)));
   }
   function setupDC(ch){
@@ -609,7 +641,7 @@
   }
   async function makeOffer(){
     try{
-      createPC();
+      createPC(true);
       const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
       await pc.setLocalDescription(off);
       const sdp=await waitIce(pc);
@@ -620,7 +652,7 @@
   async function makeAnswerFromOffer(){
     try{
       const offer=JSON.parse(sdpBox.value||'{}');
-      createPC();
+      createPC(false);
       await pc.setRemoteDescription(offer);
       const ans=await pc.createAnswer();
       await pc.setLocalDescription(ans);
@@ -662,7 +694,7 @@
       appendChat('Ruolo Tecnico: genero l\'offerta, copiala al partner.','sys');
       await makeOffer();
     } else {
-      createPC();
+      // L'Esperto crea il pc al momento di "Crea Risposta da Offerta" (vedi makeAnswerFromOffer).
       appendChat('Ruolo Esperto: incolla l\'offerta ricevuta e premi "Crea Risposta da Offerta".','sys');
     }
   });
