@@ -453,7 +453,7 @@
     penBtn && (penBtn.onclick=()=>mode='pen');
     eraserBtn && (eraserBtn.onclick=()=>mode='eraser');
     clearBtn && (clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}); });
-    shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){} });
+    shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){ console.warn('annoShare:', e); appendChat('Impossibile condividere lo schema','sys'); } });
 
     // Hook per ricezione via data channel
     const oldHook = window.__setupDC__;
@@ -507,7 +507,7 @@
               }
             }
           }
-        }catch{}
+        }catch(e){ console.warn('DC message handler:', e); }
       });
     };
   }
@@ -630,7 +630,7 @@
     dc=ch;
     dc.onopen = ()=>{ appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle'); };
     dc.onclose= ()=>{ live?.classList.add('idle'); };
-    dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} };
+    dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch(e){ console.warn('DC chat parse:', e); } };
     if(window.__setupDC__) window.__setupDC__(ch);
   }
   async function waitIce(pc){
