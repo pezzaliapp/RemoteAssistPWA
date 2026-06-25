@@ -8,6 +8,20 @@
   // --- helpers ---
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 
+  // Valida un URL ricevuto dal peer prima di assegnarlo a iframe.src (SEC-01).
+  // Consente solo http:/https: e blob: della stessa origine; rifiuta javascript:/data:/vbscript:.
+  function safeDocUrl(raw){
+    if(typeof raw!=='string' || !raw) return null;
+    let u;
+    try{ u=new URL(raw, location.href); }catch{ return null; }
+    if(u.protocol==='http:' || u.protocol==='https:') return u.href;
+    if(u.protocol==='blob:'){
+      // blob:<origin>/<uuid> — accetta solo blob della stessa origine.
+      try{ return new URL(u.pathname).origin===location.origin ? u.href : null; }catch{ return null; }
+    }
+    return null; // javascript:, data:, vbscript:, file:, ecc.
+  }
+
   // Tabs
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{
     $$('.tab').forEach(t=>t.classList.remove('active'));
@@ -102,12 +116,21 @@
     if(cameraSelect) cameraSelect.innerHTML=cams.map(d=>`<option value="${d.deviceId}">${d.label||'Camera'}</option>`).join('');
   }
   async function addCam(){
-    const stream=await navigator.mediaDevices.getUserMedia({
-      video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined},
-      audio: micToggle?.checked
-    });
-    addTile(stream);
-    if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:{deviceId:cameraSelect.value?{exact:cameraSelect.value}:undefined},
+        audio: micToggle?.checked
+      });
+      addTile(stream);
+      if(pc){
+        stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+        // Camera aggiunta dopo la connessione: rinegozia (vedi onnegotiationneeded).
+      }
+      listCams().catch(()=>{}); // ora con permesso le etichette si popolano
+    }catch(err){
+      console.warn('addCam:', err);
+      appendChat('Impossibile aggiungere la camera: '+(err?.message||err),'sys');
+    }
   }
   function addTile(stream,label='locale'){
     const wrap=document.createElement('div');
@@ -167,21 +190,113 @@
   }
   btnAddCam?.addEventListener('click', addCam);
   btnStopAll?.addEventListener('click', stopAll);
-  navigator.mediaDevices?.getUserMedia?.({video:true}).then(()=>listCams());
+  // BUG-05: niente prompt camera all'avvio. Enumeriamo i device senza chiedere
+  // permessi (le etichette restano vuote finche l'utente non preme "Aggiungi").
+  listCams().catch(e=>console.warn('listCams:', e));
+  navigator.mediaDevices?.addEventListener?.('devicechange', ()=>listCams().catch(()=>{}));
+
+  // ===== Modalità Mobile Cam: camera posteriore, torch, fullscreen, blocco orientamento =====
+  // Feature-detection + degradazione con grazia: nessun pulsante resta "morto" (BUG-02).
+  (function initMobileCam(){
+    const btnRear=$('#btnRearCam'), btnTorch=$('#btnTorch'), btnFull=$('#btnFullscreen'), btnLock=$('#btnLock');
+    let rearTile=null, rearTrack=null, torchOn=false;
+
+    btnRear?.addEventListener('click', async ()=>{
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({
+          video:{facingMode:{ideal:'environment'}}, audio:false
+        });
+        rearTile=addTile(stream,'posteriore');
+        rearTrack=stream.getVideoTracks()[0]||null;
+        if(pc) stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+        // Abilita il torch solo se la track lo supporta.
+        const caps=rearTrack?.getCapabilities?.()||{};
+        if(btnTorch){
+          if('torch' in caps){ btnTorch.disabled=false; }
+          else { btnTorch.disabled=true; btnTorch.title='Torch non supportato su questo dispositivo'; }
+        }
+      }catch(err){
+        console.warn('rearCam:', err);
+        appendChat('Camera posteriore non disponibile: '+(err?.message||err),'sys');
+      }
+    });
+
+    btnTorch?.addEventListener('click', async ()=>{
+      if(!rearTrack){ appendChat('Avvia prima la camera posteriore','sys'); return; }
+      const caps=rearTrack.getCapabilities?.()||{};
+      if(!('torch' in caps)){ btnTorch.disabled=true; appendChat('Torch non supportato','sys'); return; }
+      try{
+        torchOn=!torchOn;
+        await rearTrack.applyConstraints({advanced:[{torch:torchOn}]});
+        btnTorch.textContent=torchOn?'Torch OFF':'Torch ON';
+      }catch(err){
+        console.warn('torch:', err);
+        appendChat('Torch non attivabile: '+(err?.message||err),'sys');
+      }
+    });
+
+    btnFull?.addEventListener('click', async ()=>{
+      const target=videoGrid||document.body;
+      try{
+        if(document.fullscreenElement){ await document.exitFullscreen(); }
+        else if(target.requestFullscreen){ await target.requestFullscreen(); }
+        else { appendChat('Fullscreen non supportato su questo browser','sys'); }
+      }catch(err){
+        console.warn('fullscreen:', err);
+        appendChat('Fullscreen non disponibile: '+(err?.message||err),'sys');
+      }
+    });
+
+    // Blocco orientamento: supportato solo su alcuni browser (Chrome Android) e in fullscreen.
+    if(btnLock){
+      const canLock = !!(screen.orientation && typeof screen.orientation.lock==='function');
+      if(!canLock){ btnLock.disabled=true; btnLock.title='Blocco orientamento non supportato'; }
+      btnLock.addEventListener('click', async ()=>{
+        try{
+          if(!document.fullscreenElement && (videoGrid||document.body).requestFullscreen){
+            await (videoGrid||document.body).requestFullscreen();
+          }
+          await screen.orientation.lock('portrait');
+          appendChat('Orientamento bloccato in verticale','sys');
+        }catch(err){
+          console.warn('orientation.lock:', err);
+          appendChat('Blocco orientamento non riuscito: '+(err?.message||err),'sys');
+        }
+      });
+    }
+  })();
 
   // ===== Recorder =====
   let mediaRecorder, chunks=[];
+  // BUG-07: scegli il primo mimeType supportato (Safari non supporta WebM/VP9).
+  function pickRecMime(){
+    if(typeof MediaRecorder==='undefined' || !MediaRecorder.isTypeSupported) return '';
+    const candidates=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'];
+    return candidates.find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  }
   $('#btnRec')?.addEventListener('click', ()=>{
+    if(typeof MediaRecorder==='undefined'){ appendChat('Registrazione non supportata su questo browser','sys'); return; }
     if(!mediaRecorder || mediaRecorder.state==='inactive'){
       const mix=new MediaStream();
       $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=>mix.addTrack(t)));
-      mediaRecorder=new MediaRecorder(mix,{mimeType:'video/webm;codecs=vp9'});
-      mediaRecorder.ondataavailable=e=>chunks.push(e.data);
+      if(mix.getTracks().length===0){ appendChat('Nessuna camera attiva da registrare. Aggiungi una sorgente video.','sys'); return; }
+      const mime=pickRecMime();
+      try{
+        mediaRecorder = mime ? new MediaRecorder(mix,{mimeType:mime}) : new MediaRecorder(mix);
+      }catch(err){
+        console.warn('MediaRecorder:', err);
+        appendChat('Registrazione non avviabile: '+(err?.message||err),'sys');
+        return;
+      }
+      const recType=mediaRecorder.mimeType||mime||'video/webm';
+      const ext=recType.includes('mp4')?'mp4':'webm';
+      chunks=[];
+      mediaRecorder.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
       mediaRecorder.onstop=()=>{
-        const blob=new Blob(chunks,{type:'video/webm'});
+        const blob=new Blob(chunks,{type:recType});
         chunks=[];
         const url=URL.createObjectURL(blob);
-        const a=$('#downloadRec'); a.href=url; a.download='session.webm';
+        const a=$('#downloadRec'); a.href=url; a.download='session.'+ext;
         a.classList.remove('hidden'); a.textContent='Scarica registrazione';
       };
       mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec';
@@ -354,7 +469,7 @@
     penBtn && (penBtn.onclick=()=>mode='pen');
     eraserBtn && (eraserBtn.onclick=()=>mode='eraser');
     clearBtn && (clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}); });
-    shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){} });
+    shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){ console.warn('annoShare:', e); appendChat('Impossibile condividere lo schema','sys'); } });
 
     // Hook per ricezione via data channel
     const oldHook = window.__setupDC__;
@@ -373,8 +488,18 @@
             }
             if(m.evt==='up') last=null;
           }
-          if(m.t==='annoImage'){ /* opzionale */ }
-          if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
+          if(m.t==='annoImage' && m.data){ // BUG-10: disegna lo schema ricevuto
+            const img=new Image();
+            img.onload=()=>{ try{ ctx.drawImage(img,0,0,canvas.width,canvas.height); }catch(e){ console.warn('annoImage draw:', e); } };
+            img.onerror=()=>console.warn('annoImage: immagine non valida');
+            img.src=m.data;
+          }
+          if(m.t==='docOpen'){
+            const df=document.getElementById('docFrame');
+            const url=safeDocUrl(m.url);
+            if(df && url){ df.src=url; }
+            else { appendChat('Documento remoto rifiutato (URL non consentito)','sys'); }
+          }
           if(m.t==='cursor'){ // laser su documenti
             const rc=document.getElementById('remoteCursor');
             if(rc){ 
@@ -398,7 +523,7 @@
               }
             }
           }
-        }catch{}
+        }catch(e){ console.warn('DC message handler:', e); }
       });
     };
   }
@@ -477,33 +602,133 @@
   });
 
   // ===== WebRTC base + GitHub Issues (ridotto) =====
-  let pc=null, dc=null;
-  function createPC(){
-    pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+  let pc=null, dc=null, isOfferer=false;
+
+  // Lista ICE configurabile (oggetto qui o JSON in localStorage 'iceServers').
+  // NB: solo STUN non basta su NAT simmetrici / reti mobili o aziendali: per reti
+  // reali serve un TURN. Aggiungilo qui o via localStorage — NON inseriamo
+  // credenziali TURN di default per non spedire segreti nel repo.
+  const DEFAULT_ICE=[{urls:'stun:stun.l.google.com:19302'}];
+  function getIceServers(){
+    try{ const j=localStorage.getItem('iceServers'); if(j){ const a=JSON.parse(j); if(Array.isArray(a)&&a.length) return a; } }
+    catch(e){ console.warn('iceServers config:', e); }
+    return DEFAULT_ICE;
+  }
+
+  function createPC(asOfferer=false){
+    isOfferer=!!asOfferer;
+    pc=new RTCPeerConnection({iceServers:getIceServers()});
     pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); };
     pc.ondatachannel=e=>setupDC(e.channel);
-    dc=pc.createDataChannel('ra'); setupDC(dc);
+    pc.onconnectionstatechange=()=>{
+      const st=pc.connectionState;
+      if(st==='connected') live?.classList.remove('idle');
+      else if(st==='disconnected'||st==='failed'||st==='closed') live?.classList.add('idle');
+      if(st==='failed') appendChat('Connessione fallita (probabile NAT/firewall: serve un TURN).','sys');
+    };
+    // Camera aggiunta a caldo: l'offerer rigenera l'offerta (manual signaling => va re-inviata).
+    pc.onnegotiationneeded=async ()=>{
+      if(!isOfferer || !dc || dc.readyState!=='open') return;
+      try{
+        const off=await pc.createOffer();
+        await pc.setLocalDescription(off);
+        const sdp=await waitIce(pc);
+        sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp});
+        appendChat('Nuova sorgente: offerta rigenerata — invia di nuovo l\'SDP al partner.','sys');
+        openTab('signal');
+      }catch(err){ console.warn('renegotiate:', err); }
+    };
+    // Solo l'offerer crea il data channel; l'answerer lo riceve via ondatachannel (no doppio canale).
+    if(asOfferer){ dc=pc.createDataChannel('ra'); setupDC(dc); }
     $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject)));
   }
   function setupDC(ch){
     dc=ch;
     dc.onopen = ()=>{ appendChat('(canale dati aperto)','sys'); live?.classList.remove('idle'); };
     dc.onclose= ()=>{ live?.classList.add('idle'); };
-    dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch{} };
+    dc.onmessage=(ev)=>{ try{ const m=JSON.parse(ev.data); if(m.t==='chat') appendChat(m.text,'remote'); }catch(e){ console.warn('DC chat parse:', e); } };
     if(window.__setupDC__) window.__setupDC__(ch);
   }
   async function waitIce(pc){
+    // BUG-08: non bloccarsi se lo STUN è irraggiungibile: risolvi con la
+    // localDescription (anche parziale) dopo un timeout.
     return new Promise(res=>{
       if(pc.iceGatheringState==='complete') return res(pc.localDescription);
-      pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') res(pc.localDescription); };
+      let done=false;
+      const finish=()=>{ if(done) return; done=true; res(pc.localDescription); };
+      pc.onicegatheringstatechange=()=>{ if(pc.iceGatheringState==='complete') finish(); };
+      setTimeout(finish, 2000);
     });
   }
-  async function makeOffer(){ createPC(); const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true}); await pc.setLocalDescription(off); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp}); }
-  async function makeAnswerFromOffer(){ const offer=JSON.parse(sdpBox.value||'{}'); createPC(); await pc.setRemoteDescription(offer); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); const sdp=await waitIce(pc); sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp}); }
-  async function applyAnswer(){ const ans=JSON.parse(sdpBox.value||'{}'); await pc.setRemoteDescription(ans); }
+  async function makeOffer(){
+    try{
+      createPC(true);
+      const off=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+      await pc.setLocalDescription(off);
+      const sdp=await waitIce(pc);
+      sdpBox.value=JSON.stringify({type:'offer',sdp:sdp.sdp});
+      appendChat('Offerta generata: copiala e inviala al partner.','sys');
+    }catch(err){ console.warn('makeOffer:', err); appendChat('Errore generando l\'offerta: '+(err?.message||err),'sys'); }
+  }
+  async function makeAnswerFromOffer(){
+    try{
+      const offer=JSON.parse(sdpBox.value||'{}');
+      createPC(false);
+      await pc.setRemoteDescription(offer);
+      const ans=await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      const sdp=await waitIce(pc);
+      sdpBox.value=JSON.stringify({type:'answer', sdp:sdp.sdp});
+      appendChat('Risposta creata: inviala al partner.','sys');
+    }catch(err){ console.warn('makeAnswer:', err); appendChat('Offerta non valida o errore: '+(err?.message||err),'sys'); }
+  }
+  async function applyAnswer(){
+    if(!pc){ appendChat('Genera prima un\'offerta.','sys'); return; } // BUG-09
+    try{
+      const ans=JSON.parse(sdpBox.value||'{}');
+      await pc.setRemoteDescription(ans);
+      appendChat('Risposta applicata.','sys');
+    }catch(err){ console.warn('applyAnswer:', err); appendChat('Risposta non valida: '+(err?.message||err),'sys'); }
+  }
   document.getElementById('btnMakeOffer')?.addEventListener('click', makeOffer);
   document.getElementById('btnMakeAnswer')?.addEventListener('click', makeAnswerFromOffer);
   document.getElementById('btnApplyAnswer')?.addEventListener('click', applyAnswer);
+
+  // ===== Sessione: Entra / Esci + selettore signaling (BUG-03, BUG-04) =====
+  const roleSel=$('#role'), sigModeSel=$('#sigMode'), ghBox2=$('#ghBox2');
+  function openTab(name){ document.querySelector(`.tab[data-tab="${name}"]`)?.click(); }
+
+  // BUG-04: mostra il box GitHub solo quando il signaling scelto è "github".
+  function applySigMode(){
+    if(!ghBox2) return;
+    ghBox2.classList.toggle('hidden', (sigModeSel?.value||'manual')!=='github');
+  }
+  sigModeSel?.addEventListener('change', applySigMode);
+  applySigMode(); // default: Manuale -> box GitHub nascosto
+
+  $('#btnJoin')?.addEventListener('click', async ()=>{
+    if(pc){ appendChat('Sessione già avviata. Premi "Esci" per chiuderla.','sys'); openTab('signal'); return; }
+    const role=roleSel?.value||'tech';
+    openTab('signal');
+    live?.classList.remove('idle');
+    if(role==='tech'){
+      appendChat('Ruolo Tecnico: genero l\'offerta, copiala al partner.','sys');
+      await makeOffer();
+    } else {
+      // L'Esperto crea il pc al momento di "Crea Risposta da Offerta" (vedi makeAnswerFromOffer).
+      appendChat('Ruolo Esperto: incolla l\'offerta ricevuta e premi "Crea Risposta da Offerta".','sys');
+    }
+  });
+
+  $('#btnLeave')?.addEventListener('click', ()=>{
+    try{ dc?.close?.(); }catch(e){ console.warn('dc.close:', e); }
+    try{ pc?.close?.(); }catch(e){ console.warn('pc.close:', e); }
+    pc=null; dc=null;
+    stopAll();
+    if(sdpBox) sdpBox.value='';
+    live?.classList.add('idle');
+    appendChat('Sessione chiusa.','sys');
+  });
 
   function logGH(s){ ghLog.value+=(s+'\n'); ghLog.scrollTop=ghLog.scrollHeight; }
   async function ghFetch(path, opts={}){
@@ -645,10 +870,13 @@
     });
   }
 
-  // ===== SW: ricarica quando c’è una nuova versione =====
+  // ===== SW: registrazione (spostata da index.html per la CSP) + ricarica su nuova versione =====
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW register:', err));
     });
   }
 })();

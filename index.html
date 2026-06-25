@@ -3,6 +3,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1022">
+  <!-- CSP di base: difesa in profondità contro XSS (vedi SEC-01/SEC-03).
+       frame-src abilita i viewer PDF.js/Office; connect-src l'API GitHub usata per il signaling. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self' blob: https://mozilla.github.io https://view.officeapps.live.com; base-uri 'self'; object-src 'none'">
   <title>pezzaliAPP Remote Assist SUITE v1.0</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
@@ -103,7 +106,7 @@
           <button id="btnPdfJs">Apri con PDF.js / DOCX</button>
         </div>
         <div class="docWrap">
-          <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici"></iframe>
+          <iframe id="docFrame" src="docs/sample.pdf" title="Documenti tecnici" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
           <div id="cursorOverlay"></div>
           <div id="remoteCursor" class="cursorDot hidden"></div>
           <div id="localCursor" class="cursorDot hidden"></div>
@@ -130,6 +133,9 @@
         <label>Offerta / Risposta (SDP JSON):<textarea id="sdpBox" rows="8" placeholder='{"type":"offer","sdp":"..."}'></textarea></label>
         <div class="muted">
           <p><b>GitHub Issues (beta)</b>: usa un issue come stanza e scambia OFFER/ANSWER nei commenti.</p>
+          <p class="warn" role="alert">⚠️ <b>Privacy:</b> l'SDP scambiato contiene i tuoi indirizzi IP (locali e pubblici).
+          Su un issue <b>pubblico</b> diventano leggibili da chiunque. Usa un repo/issue <b>privato</b>
+          e un <b>token fine-grained</b> con accesso al solo repo necessario.</p>
           <div id="ghBox2">
             <div class="row"><input id="ghRepo" placeholder="owner/repo"><input id="ghIssue" placeholder="# Issue"><input id="ghToken" type="password" placeholder="ghp_..."></div>
             <div class="row"><button id="btnGhStart">Collega Issue</button><button id="btnGhSend">Invia su Issue</button><button id="btnGhPoll">Aggiorna da Issue</button></div>
@@ -189,6 +195,6 @@
     <button id="startTour">🧭 Avvia guida qui</button>
     <button id="closeHelp">Chiudi</button>
   </dialog>
+  <!-- La registrazione del SW è spostata in app.js per consentire una CSP senza 'unsafe-inline' (SEC-03). -->
   <script src="app.js"></script>
-  <script> if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); } </script>
 </body></html>

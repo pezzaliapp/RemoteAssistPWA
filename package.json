@@ -1,0 +1,9 @@
+{
+  "name": "remote-assist-pwa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "pezzaliAPP Remote Assist SUITE — PWA vanilla (no build, no deps)",
+  "scripts": {
+    "check": "node --check sw.js && node --check app.js"
+  }
+}
