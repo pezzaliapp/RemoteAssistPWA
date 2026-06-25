@@ -8,6 +8,20 @@
   // --- helpers ---
   const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 
+  // Valida un URL ricevuto dal peer prima di assegnarlo a iframe.src (SEC-01).
+  // Consente solo http:/https: e blob: della stessa origine; rifiuta javascript:/data:/vbscript:.
+  function safeDocUrl(raw){
+    if(typeof raw!=='string' || !raw) return null;
+    let u;
+    try{ u=new URL(raw, location.href); }catch{ return null; }
+    if(u.protocol==='http:' || u.protocol==='https:') return u.href;
+    if(u.protocol==='blob:'){
+      // blob:<origin>/<uuid> — accetta solo blob della stessa origine.
+      try{ return new URL(u.pathname).origin===location.origin ? u.href : null; }catch{ return null; }
+    }
+    return null; // javascript:, data:, vbscript:, file:, ecc.
+  }
+
   // Tabs
   $$('.tab').forEach(b=>b.addEventListener('click', ()=>{
     $$('.tab').forEach(t=>t.classList.remove('active'));
@@ -358,7 +372,12 @@
             if(m.evt==='up') last=null;
           }
           if(m.t==='annoImage'){ /* opzionale */ }
-          if(m.t==='docOpen'){ const url=m.url; const df=document.getElementById('docFrame'); if(url && df) df.src=url; }
+          if(m.t==='docOpen'){
+            const df=document.getElementById('docFrame');
+            const url=safeDocUrl(m.url);
+            if(df && url){ df.src=url; }
+            else { appendChat('Documento remoto rifiutato (URL non consentito)','sys'); }
+          }
           if(m.t==='cursor'){ // laser su documenti
             const rc=document.getElementById('remoteCursor');
             if(rc){ 
@@ -629,10 +648,13 @@
     });
   }
 
-  // ===== SW: ricarica quando c’è una nuova versione =====
+  // ===== SW: registrazione (spostata da index.html per la CSP) + ricarica su nuova versione =====
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!window.__reloadedOnce) { window.__reloadedOnce = true; location.reload(); }
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW register:', err));
     });
   }
 })();
