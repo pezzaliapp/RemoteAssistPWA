@@ -584,6 +584,13 @@
     appendChat('Aperto con PDF.js (Mozilla viewer)','sys');
   });
 
+  // Su iOS Safari un PDF dentro <iframe> spesso resta vuoto: consenti di aprirlo in una scheda.
+  $('#btnOpenTab')?.addEventListener('click', ()=>{
+    const url = docFrame?.src || '';
+    if(!url){ appendChat('Nessun documento aperto','sys'); return; }
+    window.open(url, '_blank', 'noopener');
+  });
+
   filePicker && (filePicker.onchange=()=>{
     const f=filePicker.files[0]; if(!f)return;
     const url=URL.createObjectURL(f);
@@ -618,7 +625,15 @@
   function createPC(asOfferer=false){
     isOfferer=!!asOfferer;
     pc=new RTCPeerConnection({iceServers:getIceServers()});
-    pc.ontrack=e=>{ const s=e.streams[0]||new MediaStream([e.track]); addTile(s,'remoto'); };
+    // ontrack scatta una volta PER TRACCIA: con video+audio creerebbe due tile
+    // per lo stesso stream remoto. Deduplica per stream id.
+    const seenRemote=new Set();
+    pc.ontrack=e=>{
+      const s=e.streams[0]||new MediaStream([e.track]);
+      if(seenRemote.has(s.id)) return;
+      seenRemote.add(s.id);
+      addTile(s,'remoto');
+    };
     pc.ondatachannel=e=>setupDC(e.channel);
     pc.onconnectionstatechange=()=>{
       const st=pc.connectionState;
