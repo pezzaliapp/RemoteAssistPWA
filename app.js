@@ -15,11 +15,9 @@
     let u;
     try{ u=new URL(raw, location.href); }catch{ return null; }
     if(u.protocol==='http:' || u.protocol==='https:') return u.href;
-    if(u.protocol==='blob:'){
-      // blob:<origin>/<uuid> — accetta solo blob della stessa origine.
-      try{ return new URL(u.pathname).origin===location.origin ? u.href : null; }catch{ return null; }
-    }
-    return null; // javascript:, data:, vbscript:, file:, ecc.
+    // FIX: i blob: URL sono validi solo nel browser che li ha creati; un blob
+    // ricevuto dal peer non è mai risolvibile qui e produrrebbe un frame rotto.
+    return null; // blob:, javascript:, data:, vbscript:, file:, ecc.
   }
 
   // Tabs
@@ -295,8 +293,10 @@
       mediaRecorder.onstop=()=>{
         const blob=new Blob(chunks,{type:recType});
         chunks=[];
+        const a=$('#downloadRec');
+        if(a.href && a.href.startsWith('blob:')){ try{ URL.revokeObjectURL(a.href); }catch{} }
         const url=URL.createObjectURL(blob);
-        const a=$('#downloadRec'); a.href=url; a.download='session.'+ext;
+        a.href=url; a.download='session.'+ext;
         a.classList.remove('hidden'); a.textContent='Scarica registrazione';
       };
       mediaRecorder.start(); $('#btnRec').textContent='Ferma Rec';
@@ -411,6 +411,8 @@
   // ===== Chat =====
   const chatLog=$('#chatLog'), chatInput=$('#chatInput');
   $('#chatSend')?.addEventListener('click', ()=>{ sendChat(chatInput.value); chatInput.value=''; });
+  // FIX: invio anche con il tasto Enter (prima l'unico modo era il pulsante).
+  chatInput?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(chatInput.value); chatInput.value=''; } });
   function appendChat(msg,who='me'){
     const div=document.createElement('div');
     div.className='m';
@@ -456,39 +458,48 @@
       const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
       return {x,y};
     }
-    function seg(a,b){
-      ctx.globalCompositeOperation = (mode==='pen' ? 'source-over' : 'destination-out');
-      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=+thick.value; ctx.strokeStyle='#2dd4bf';
+    function seg(a,b,m=mode,w=+thick.value){
+      ctx.globalCompositeOperation = (m==='pen' ? 'source-over' : 'destination-out');
+      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.lineWidth=w; ctx.strokeStyle='#2dd4bf';
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
     }
+    // FIX: il canvas veniva dimensionato solo dal ResizeObserver; se si disegnava
+    // o condivideva prima che scattasse (pannello appena mostrato) il canvas era 1x1
+    // e lo "schema condiviso" arrivava al remoto come PNG vuoto.
+    function ensureSized(){ if(canvas.width<=2 || canvas.height<=2) sizeCanvasToParent(); }
+    document.querySelector('.tab[data-tab="annotate"]')?.addEventListener('click', ()=>setTimeout(sizeCanvasToParent,0));
 
-    canvas.addEventListener('pointerdown', e=>{ canvas.setPointerCapture?.(e.pointerId); drawing=true; last=pt(e); seg(last,last); sendData({t:'anno',evt:'down',payload:{x:last.x,y:last.y,mode,th:+thick.value}}); });
+    canvas.addEventListener('pointerdown', e=>{ ensureSized(); canvas.setPointerCapture?.(e.pointerId); drawing=true; last=pt(e); seg(last,last); sendData({t:'anno',evt:'down',payload:{x:last.x,y:last.y,mode,th:+thick.value}}); });
     canvas.addEventListener('pointermove', e=>{ if(!drawing)return; const p=pt(e); seg(last,p); last=p; sendData({t:'anno',evt:'move',payload:{x:p.x,y:p.y,mode,th:+thick.value}}); });
     window.addEventListener('pointerup', ()=>{ if(drawing){ drawing=false; last=null; sendData({t:'anno',evt:'up'}); }});
 
     penBtn && (penBtn.onclick=()=>mode='pen');
     eraserBtn && (eraserBtn.onclick=()=>mode='eraser');
     clearBtn && (clearBtn.onclick=()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); sendData({t:'anno',evt:'clear'}); });
-    shareBtn && (shareBtn.onclick=()=>{ try{ const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys'); }catch(e){ console.warn('annoShare:', e); appendChat('Impossibile condividere lo schema','sys'); } });
+    shareBtn && (shareBtn.onclick=()=>{ try{
+      ensureSized();
+      if(canvas.width<=2 || canvas.height<=2){ appendChat('Apri il pannello Annotazioni e disegna prima di condividere.','sys'); return; }
+      if(!dc || dc.readyState!=='open'){ appendChat('Non connesso: collega prima la sessione (tab Segnaling).','sys'); return; }
+      const data=canvas.toDataURL('image/png'); sendData({t:'annoImage',data}); appendChat('Schema inviato al remoto','sys');
+    }catch(e){ console.warn('annoShare:', e); appendChat('Impossibile condividere lo schema','sys'); } });
 
     // Hook per ricezione via data channel
     const oldHook = window.__setupDC__;
     window.__setupDC__ = function(ch){
       if (oldHook) oldHook(ch);
+      let remoteLast=null; // FIX: i tratti remoti usavano lo stato del disegno locale
       ch.addEventListener('message', ev=>{
         try{
           const m = JSON.parse(ev.data);
           if(m.t==='anno'){
+            ensureSized();
             if(m.evt==='clear') ctx.clearRect(0,0,canvas.width,canvas.height);
-            if(m.evt==='down' || m.evt==='move'){
-              const p=m.payload; const prevM=mode, prevT=thick.value;
-              mode=p.mode; thick.value=p.th;
-              const from = last || {x:p.x,y:p.y}; seg(from,{x:p.x,y:p.y}); last={x:p.x,y:p.y};
-              mode=prevM; thick.value=prevT;
-            }
-            if(m.evt==='up') last=null;
+            if(m.evt==='down'){ const p=m.payload; remoteLast={x:p.x,y:p.y}; seg(remoteLast,remoteLast,p.mode,p.th); }
+            if(m.evt==='move'){ const p=m.payload; const from=remoteLast||{x:p.x,y:p.y}; seg(from,{x:p.x,y:p.y},p.mode,p.th); remoteLast={x:p.x,y:p.y}; }
+            if(m.evt==='up') remoteLast=null;
           }
           if(m.t==='annoImage' && m.data){ // BUG-10: disegna lo schema ricevuto
+            ensureSized();
             const img=new Image();
             img.onload=()=>{ try{ ctx.drawImage(img,0,0,canvas.width,canvas.height); }catch(e){ console.warn('annoImage draw:', e); } };
             img.onerror=()=>console.warn('annoImage: immagine non valida');
@@ -595,7 +606,9 @@
     const f=filePicker.files[0]; if(!f)return;
     const url=URL.createObjectURL(f);
     if(docFrame) docFrame.src=url;
-    try{ dc?.readyState==='open' && dc.send(JSON.stringify({t:'docOpen', url})); }catch{}
+    // FIX: un URL blob: esiste solo in QUESTO browser; inviarlo al peer mostrava
+    // un frame rotto sul remoto. Per sincronizzare file locali serve un URL web.
+    if(dc?.readyState==='open'){ appendChat('File locale aperto. Per mostrarlo al remoto usa un URL web e "Sync vista → remoto".','sys'); }
     if(/\.docx$/i.test(f.name||'')){ appendChat('DOCX caricato in locale (blob). Per aprirlo nel viewer usa un URL web o posizionalo in /docs.', 'sys'); }
   });
 
@@ -655,7 +668,12 @@
     };
     // Solo l'offerer crea il data channel; l'answerer lo riceve via ondatachannel (no doppio canale).
     if(asOfferer){ dc=pc.createDataChannel('ra'); setupDC(dc); }
-    $$('#videoGrid video').forEach(v=> v.srcObject && v.srcObject.getTracks().forEach(t=> pc.addTrack(t, v.srcObject)));
+    // FIX: aggiungi al pc solo le sorgenti LOCALI (i tile "remoto" non vanno ritrasmessi).
+    $$('#videoGrid .tile').forEach(tile=>{
+      if(tile.querySelector('.label')?.textContent==='remoto') return;
+      const v=tile.querySelector('video');
+      v?.srcObject && v.srcObject.getTracks().forEach(t=>{ try{ pc.addTrack(t, v.srcObject); }catch(e){ console.warn('addTrack:', e); } });
+    });
   }
   function setupDC(ch){
     dc=ch;
@@ -688,7 +706,13 @@
   async function makeAnswerFromOffer(){
     try{
       const offer=JSON.parse(sdpBox.value||'{}');
-      createPC(false);
+      if(offer.type!=='offer'){ appendChat('Il testo incollato non è un\'offerta (type:"offer").','sys'); return; }
+      // FIX rinegoziazione: se la connessione esiste già (es. il partner ha
+      // aggiunto una camera a caldo e ha re-inviato l'offerta), la nuova offerta
+      // va applicata ALLA STESSA RTCPeerConnection. Prima veniva creato un nuovo
+      // pc ad ogni "Crea Risposta": sessione rotta e riquadri "remoto" duplicati.
+      if(pc && isOfferer){ appendChat('Hai generato tu l\'offerta: qui va usato "Applica Risposta".','sys'); return; }
+      if(!pc) createPC(false);
       await pc.setRemoteDescription(offer);
       const ans=await pc.createAnswer();
       await pc.setLocalDescription(ans);
@@ -701,6 +725,7 @@
     if(!pc){ appendChat('Genera prima un\'offerta.','sys'); return; } // BUG-09
     try{
       const ans=JSON.parse(sdpBox.value||'{}');
+      if(ans.type!=='answer'){ appendChat('Il testo incollato non è una risposta (type:"answer").','sys'); return; }
       await pc.setRemoteDescription(ans);
       appendChat('Risposta applicata.','sys');
     }catch(err){ console.warn('applyAnswer:', err); appendChat('Risposta non valida: '+(err?.message||err),'sys'); }
@@ -739,6 +764,9 @@
     try{ dc?.close?.(); }catch(e){ console.warn('dc.close:', e); }
     try{ pc?.close?.(); }catch(e){ console.warn('pc.close:', e); }
     pc=null; dc=null;
+    // FIX: chiudere la sessione ferma anche la registrazione in corso e il laser.
+    try{ if(mediaRecorder && mediaRecorder.state==='recording'){ mediaRecorder.stop(); const r=$('#btnRec'); if(r) r.textContent='Avvia Rec'; } }catch(e){ console.warn('rec stop:', e); }
+    try{ setLaser(false); $('#remoteCursor')?.classList.add('hidden'); }catch{}
     stopAll();
     if(sdpBox) sdpBox.value='';
     live?.classList.add('idle');

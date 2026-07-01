@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#0b1022">
   <!-- CSP di base: difesa in profondità contro XSS (vedi SEC-01/SEC-03).
        frame-src abilita i viewer PDF.js/Office; connect-src l'API GitHub usata per il signaling. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self' blob: https://mozilla.github.io https://view.officeapps.live.com; base-uri 'self'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self' blob: https://docs.google.com https://view.officeapps.live.com; base-uri 'self'; object-src 'none'">
   <title>pezzaliAPP Remote Assist SUITE v1.0</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
@@ -103,7 +103,7 @@
           <input type="file" id="filePicker" accept=".pdf,.png,.jpg,.jpeg,.svg,.doc,.docx">
           <button id="btnSync">Sync vista → remoto</button>
           <button id="btnLaser">Laser ON</button>
-          <button id="btnPdfJs">Apri con PDF.js / DOCX</button>
+          <button id="btnPdfJs" title="Richiede che il documento abbia un URL web pubblico">Apri nel viewer (PDF/DOCX)</button>
           <button id="btnOpenTab" title="Su iPhone il PDF nell'anteprima può non caricarsi: aprilo qui">Apri in nuova scheda ⧉</button>
         </div>
         <div class="docWrap">

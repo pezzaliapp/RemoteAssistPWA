@@ -1,6 +1,6 @@
 // sw.js — network-first per l'app-shell (aggiornamenti immediati), cache come fallback offline.
 // Il vecchio cache-first congelava CSS/JS: un fix pushato non arrivava mai al dispositivo.
-const CACHE='pezzaliapp-remoteassist-v3';
+const CACHE='pezzaliapp-remoteassist-v4';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest',
   './icons/icon-192.png','./icons/icon-512.png','./icons/pezzaliAPP-logo.svg',
   './docs/sample.pdf','./docs/bg.jpg','./docs/guida.html'];
@@ -27,9 +27,19 @@ self.addEventListener('fetch',e=>{
   // aggiorna la cache, e usa la cache solo se offline.
   e.respondWith(
     fetch(req).then(res=>{
-      const copy=res.clone();
-      caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
+      // FIX: non avvelenare la cache con errori (404/500) o risposte parziali (206).
+      if(res.ok && res.status!==206){
+        const copy=res.clone();
+        caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
+      }
       return res;
-    }).catch(()=> caches.match(req).then(r=> r || caches.match('./index.html')))
+    }).catch(()=> caches.match(req).then(r=>{
+      if(r) return r;
+      // FIX: il fallback a index.html vale solo per le NAVIGAZIONI: prima veniva
+      // servito index.html anche a richieste di CSS/JS/immagini mancanti offline,
+      // con contenuti dal MIME sbagliato.
+      if(req.mode==='navigate') return caches.match('./index.html');
+      return Response.error();
+    }))
   );
 });
